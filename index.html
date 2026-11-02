@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Natura Local · Parc Mataró</title>
+<meta name="description" content="Prototip de web app de Natura Local que funciona sense cobertura.">
+<meta name="theme-color" content="#2f7d4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Natura Local">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- Home: route card, offline download, list of points -->
+<main id="home" class="screen">
+  <header class="top">
+    <div class="brand">Natura Local</div>
+    <span class="proto">Prototip</span>
+    <span id="net" class="net" aria-live="polite"></span>
+  </header>
+  <div class="hero"><img id="heroImg" alt=""></div>
+  <section class="pad">
+    <h1 id="rTitle"></h1>
+    <ul class="chips" id="rStats"></ul>
+
+    <div class="offline" id="offBox">
+      <div class="offline-head">
+        <strong>Sense cobertura</strong>
+        <span id="offState" class="pill">Comprovant…</span>
+      </div>
+      <p id="offText" class="muted"></p>
+      <div class="bar"><i id="offBar"></i></div>
+      <div class="row">
+        <button id="dlBtn" class="primary">Descarrega la ruta</button>
+        <button id="installBtn" hidden>Instal·la l'app</button>
+      </div>
+      <p id="iosHint" class="hint" hidden>A l'iPhone: botó <b>Compartir</b> → <b>Afegeix a la pantalla d'inici</b>. Obre-la sempre des de la icona.</p>
+    </div>
+
+    <button id="startBtn" class="big primary">Comença la ruta</button>
+
+    <h2>Punts de la ruta</h2>
+    <ol class="poilist" id="poiList"></ol>
+
+    <details class="diag">
+      <summary>Informe per a proves</summary>
+      <p class="muted">Si alguna cosa no va, prem «Copia l'informe» i enganxa'l al xat.</p>
+      <pre id="diagLog"></pre>
+      <div class="row"><button id="copyDiag">Copia l'informe</button><button id="resetBtn">Esborra la descàrrega</button></div>
+    </details>
+    <p class="foot muted">Mapa: © col·laboradors d'OpenStreetMap (ODbL). Continguts: Natura Local.</p>
+  </section>
+</main>
+
+<!-- Navigation: full-screen map -->
+<section id="nav" class="screen" hidden>
+  <div class="mapwrap">
+    <canvas id="map" aria-label="Mapa de la ruta"></canvas>
+    <div class="maptop">
+      <button id="backBtn" class="round" aria-label="Torna">‹</button>
+      <span id="net2" class="net"></span>
+    </div>
+    <div class="mapbtns">
+      <button id="zin" aria-label="Apropa">+</button>
+      <button id="zout" aria-label="Allunya">−</button>
+      <button id="rotBtn" aria-pressed="false" title="Mapa orientat cap on mires">N</button>
+      <button id="meBtn" aria-pressed="true" title="Segueix la meva posició">◎</button>
+    </div>
+    <div id="offroute" class="offroute" hidden>Fora de la ruta</div>
+    <div id="toast" class="toast" hidden></div>
+    <div class="attr">© OpenStreetMap</div>
+  </div>
+  <div class="card">
+    <div class="bar"><i id="progBar"></i></div>
+    <div class="stats">
+      <div class="stat"><b id="sDone">0 m</b><span>Fet</span></div>
+      <div class="stat"><b id="sLeft">–</b><span>Falta</span></div>
+      <div class="stat"><b id="sTre">0/0</b><span>Tresors</span></div>
+    </div>
+    <button class="next" id="nextBtn"><span class="badge" id="nBadge">1</span><span><small id="nDist">Següent punt</small><strong id="nName"></strong></span></button>
+    <div class="row">
+      <button id="gpsBtn" class="primary">Activa el GPS</button>
+      <button id="voiceBtn" aria-pressed="true">Veu: sí</button>
+      <button id="simBtn">Simula</button>
+    </div>
+    <p id="gpsNote" class="note"></p>
+  </div>
+</section>
+
+<!-- Point sheet -->
+<div id="sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="shTitle">
+  <div class="sheet-in">
+    <button id="shClose" class="round close" aria-label="Tanca">×</button>
+    <div class="gallery" id="shGal"></div>
+    <div class="pad">
+      <small id="shTheme" class="theme"></small>
+      <h2 id="shTitle"></h2>
+      <div class="row" id="shActions"></div>
+      <audio id="shAudio" controls preload="none" hidden></audio>
+      <video id="shVideo" controls playsinline preload="none" hidden></video>
+      <div id="shBody" class="body"></div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
