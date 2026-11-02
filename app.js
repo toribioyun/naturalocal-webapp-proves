@@ -1,6 +1,7 @@
 /* Natura Local – offline route prototype (Parc Mataró gamificada).
    Data: data.json (route + points, from naturalocal.net) and basemap.json (OpenStreetMap ways).
-   Offline: sw.js caches the app; "Descarrega la ruta" puts all media in the cache. */
+   Two ways: online (no download; sw.js saves app, data, map and every media file opened)
+   or downloaded ("Descarrega la ruta" puts all media in the cache before leaving). */
 'use strict';
 const $ = id => document.getElementById(id);
 const MEDIA_CACHE = 'nl-rutes';
@@ -26,8 +27,14 @@ function updateNet() {
     el.classList.toggle('off', !on);
   }
 }
-addEventListener('online', () => { updateNet(); log('Connexió: sí'); });
-addEventListener('offline', () => { updateNet(); log('Connexió: no'); });
+addEventListener('online', () => { updateNet(); log('Connexió: sí'); if (D) checkOffline(); });
+addEventListener('offline', () => { updateNet(); log('Connexió: no'); if (D) checkOffline(); });
+// Images that can't load (offline and not saved) are hidden instead of showing a broken icon.
+document.addEventListener('error', e => {
+  if (e.target.tagName !== 'IMG') return;
+  e.target.classList.add('broken');
+  if (e.target.closest('#shGal')) noteMissing('fotos');
+}, true);
 
 /* ---------- service worker + install ---------- */
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -112,20 +119,26 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', 
 /* ---------- offline download ---------- */
 async function checkOffline() {
   const files = mediaList();
-  if (!('caches' in window)) { setOff(false, 'Aquest navegador no pot guardar la ruta.'); $('dlBtn').disabled = true; return; }
+  if (!('caches' in window)) { setOff(false, 'Aquest navegador no pot guardar la ruta: només es pot fer amb cobertura.'); $('dlBtn').disabled = true; return; }
   const c = await caches.open(MEDIA_CACHE);
   let have = 0; for (const f of files) if (await c.match(f)) have++;
   const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
   const persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : false;
   log(`Fitxers guardats: ${have}/${files.length}` + (est ? ` · espai usat ${(est.usage / 1e6).toFixed(1)} MB` : '') + ` · guardat persistent: ${persisted ? 'sí' : 'no'}`);
+  $('offBar').style.width = (100 * have / files.length) + '%';
   if (have === files.length) {
-    setOff(true, 'La ruta, el mapa, les fotos, els àudios i els vídeos estan guardats al mòbil. Ja pots posar el mode avió.');
-    $('dlBtn').textContent = 'Torna a descarregar'; $('offBar').style.width = '100%';
-  } else setOff(false, `Abans de sortir, descarrega-la amb connexió (uns 8 MB). Guardats: ${have} de ${files.length}.`);
+    setOff(true, 'Descarregada: la ruta, el mapa, les fotos, els àudios i els vídeos estan guardats al mòbil. Ja pots posar el mode avió.');
+    $('dlBtn').textContent = 'Torna a descarregar';
+  } else if (!navigator.onLine) {
+    setOff(false, `Ara no tens connexió. Pots fer la ruta igualment, però sense les fotos, els àudios i els vídeos que no tens guardats (en tens ${have} de ${files.length}).`);
+  } else {
+    setOff(false, have ? `Ja tens guardats ${have} de ${files.length} fitxers (els que has obert). Si vols anar sense cobertura, descarrega la resta.` : '');
+    $('dlBtn').textContent = 'Descarrega la ruta';
+  }
 }
 function setOff(ok, txt) {
-  const s = $('offState'); s.textContent = ok ? 'Preparada ✓' : 'No descarregada'; s.classList.toggle('ok', ok);
-  $('offText').textContent = txt;
+  const s = $('offState'); s.textContent = ok ? 'Descarregada ✓' : 'No descarregada'; s.classList.toggle('ok', ok); s.classList.toggle('info', !ok);
+  $('offText').textContent = txt; $('offText').hidden = !txt;
 }
 $('dlBtn').onclick = async () => {
   if (!navigator.onLine) { alertMsg('Ara no tens connexió. Descarrega-la abans de posar el mode avió.'); return; }
@@ -163,12 +176,28 @@ function openSheet(i) {
   const au = $('shAudio'), vi = $('shVideo');
   au.hidden = !p.audio.length; au.src = p.audio.length ? 'media/' + p.audio[0] : '';
   vi.hidden = !p.video.length; vi.src = p.video.length ? 'media/' + p.video[0] : '';
+  missKinds.clear(); $('shMiss').hidden = true;
+  if (!navigator.onLine) checkMissing(p);
   $('shBody').innerHTML = p.html || (isTreasure(p) ? `<p>${found.has(p.id) ? 'Tresor trobat! ★' : 'Apropa\'t a aquest punt per trobar el tresor.'}</p>` : '<p class="muted">Aquest punt encara no té text.</p>');
   const text = $('shBody').innerText.trim();
   $('shActions').innerHTML = text && 'speechSynthesis' in window ? '<button id="ttsBtn">Llegeix en veu alta</button>' : '';
   if ($('ttsBtn')) $('ttsBtn').onclick = () => speak(p.name + '. ' + text, true);
   $('sheet').hidden = false;
 }
+// Offline and not saved: hide that audio/video and say what is missing.
+const missKinds = new Set();
+function noteMissing(kind) {
+  missKinds.add(kind);
+  $('shMiss').textContent = 'Sense cobertura i no descarregat, no es pot mostrar: ' + [...missKinds].join(', ') + '.';
+  $('shMiss').hidden = false;
+}
+async function checkMissing(p) {
+  const c = await caches.open(MEDIA_CACHE);
+  if (p.audio.length && !(await c.match('media/' + p.audio[0]))) { $('shAudio').hidden = true; noteMissing('àudio'); }
+  if (p.video.length && !(await c.match('media/' + p.video[0]))) { $('shVideo').hidden = true; noteMissing('vídeo'); }
+}
+$('shAudio').onerror = () => { if (sheetIdx >= 0 && POIS[sheetIdx].audio.length) { $('shAudio').hidden = true; noteMissing('àudio'); } };
+$('shVideo').onerror = () => { if (sheetIdx >= 0 && POIS[sheetIdx].video.length) { $('shVideo').hidden = true; noteMissing('vídeo'); } };
 function closeSheet() { $('sheet').hidden = true; $('shAudio').pause(); $('shVideo').pause(); try { speechSynthesis.cancel(); } catch (e) {} }
 $('shClose').onclick = closeSheet;
 $('sheet').onclick = e => { if (e.target === $('sheet')) closeSheet(); };
@@ -409,7 +438,7 @@ async function startCompass() {
 /* ---------- screens ---------- */
 function show(nav) {
   $('home').hidden = nav; $('nav').hidden = !nav;
-  if (nav) { resize(); if (!me) fitRoute(); }
+  if (nav) { resize(); if (!me) fitRoute(); } else checkOffline();
 }
 $('startBtn').onclick = () => { show(true); history.pushState({nav: 1}, ''); };
 $('backBtn').onclick = () => history.back();

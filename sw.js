@@ -1,6 +1,8 @@
 // Service worker: keeps the app and the downloaded route available without connection.
 // Cache-first for everything in this folder. Bump VERSION when files change.
-const VERSION = 'v1-20261102';
+// App, data and map are always saved; media opened online is saved too (nl-rutes),
+// so the route keeps working if coverage is lost without having downloaded it.
+const VERSION = 'v2-20261102';
 const SHELL = 'nl-shell-' + VERSION;
 const ROUTES = 'nl-rutes'; // media of downloaded routes (kept across app versions)
 const SHELL_FILES = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest',
@@ -16,22 +18,19 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
-  // Range requests (video/audio seeking) are answered from the full cached file.
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith((async () => {
     const hit = await caches.match(req.url, {ignoreSearch: true});
-    if (hit) {
-      const range = req.headers.get('range');
-      if (!range) return hit;
-      const buf = await hit.clone().arrayBuffer();
-      const m = /bytes=(\d*)-(\d*)/.exec(range) || [];
-      const start = Number(m[1] || 0), end = m[2] ? Number(m[2]) : buf.byteLength - 1;
-      return new Response(buf.slice(start, end + 1), {status: 206, headers: {
-        'Content-Type': hit.headers.get('Content-Type') || 'application/octet-stream',
-        'Content-Range': `bytes ${start}-${end}/${buf.byteLength}`,
-        'Content-Length': String(end - start + 1), 'Accept-Ranges': 'bytes'}});
-    }
+    if (hit) return serve(hit, req);
     try {
+      // Media not yet saved: fetch the whole file (not just a range), keep it and serve it.
+      if (url.pathname.includes('/media/')) {
+        const res = await fetch(req.url);
+        if (!res.ok) return res;
+        await (await caches.open(ROUTES)).put(req.url, res.clone());
+        return serve(res, req);
+      }
       return await fetch(req);
     } catch (err) {
       if (req.mode === 'navigate') return (await caches.match('index.html')) || Response.error();
@@ -39,3 +38,15 @@ self.addEventListener('fetch', e => {
     }
   })());
 });
+// Range requests (video/audio seeking) are answered from the full file.
+async function serve(full, req) {
+  const range = req.headers.get('range');
+  if (!range) return full;
+  const buf = await full.clone().arrayBuffer();
+  const m = /bytes=(\d*)-(\d*)/.exec(range) || [];
+  const start = Number(m[1] || 0), end = m[2] ? Number(m[2]) : buf.byteLength - 1;
+  return new Response(buf.slice(start, end + 1), {status: 206, headers: {
+    'Content-Type': full.headers.get('Content-Type') || 'application/octet-stream',
+    'Content-Range': `bytes ${start}-${end}/${buf.byteLength}`,
+    'Content-Length': String(end - start + 1), 'Accept-Ranges': 'bytes'}});
+}

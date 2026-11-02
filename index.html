@@ -30,10 +30,12 @@
 
     <div class="offline" id="offBox">
       <div class="offline-head">
-        <strong>Sense cobertura</strong>
+        <strong>Com vols fer la ruta?</strong>
         <span id="offState" class="pill">Comprovant…</span>
       </div>
-      <p id="offText" class="muted"></p>
+      <p class="muted"><b>Amb cobertura:</b> prem «Comença la ruta» sense descarregar res. Gasta dades mòbils (<span class="mb">uns 8 MB</span>). Si perds la cobertura, el mapa, el GPS i els avisos continuen funcionant, i el que ja hagis obert també; només falten les fotos, els àudios i els vídeos que encara no has vist.</p>
+      <p class="muted"><b>Sense cobertura:</b> descarrega-la abans de sortir, amb connexió (<span class="mb">uns 8 MB</span>), i la podràs fer tota en mode avió.</p>
+      <p id="offText"></p>
       <div class="bar"><i id="offBar"></i></div>
       <div class="row">
         <button id="dlBtn" class="primary">Descarrega la ruta</button>
@@ -100,6 +102,7 @@
     <div class="pad">
       <small id="shTheme" class="theme"></small>
       <h2 id="shTitle"></h2>
+      <p id="shMiss" class="miss" hidden></p>
       <div class="row" id="shActions"></div>
       <audio id="shAudio" controls preload="none" hidden></audio>
       <video id="shVideo" controls playsinline preload="none" hidden></video>

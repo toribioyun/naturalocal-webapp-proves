@@ -36,6 +36,9 @@ h2{font-size:1.1rem;margin:22px 0 8px}
 .offline-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .pill{font-size:.75rem;font-weight:700;border-radius:999px;padding:3px 8px;background:var(--warn-bg);color:#8a3510}
 .pill.ok{background:#dfeee4;color:#1d5a37}
+.pill.info{background:var(--bg);color:var(--muted)}
+.miss{margin:8px 0;font-size:.88rem;background:var(--warn-bg);border-radius:8px;padding:8px}
+img.broken{display:none}
 .offline p{margin:0;font-size:.88rem}
 .hint{font-size:.85rem;background:var(--bg);border-radius:8px;padding:8px}
 .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
