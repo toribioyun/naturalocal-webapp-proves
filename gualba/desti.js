@@ -115,12 +115,16 @@ function renderGuide() {
       return `<li><button data-i="${it.i}">${th}<span><small>${esc(catLabel(it))}</small><b>${esc(it.n)}</b><span class="sub">${esc(sub)}</span></span><span class="chev">›</span></button></li>`;
     }).join('')}</ul>`;
   };
-  // the editorial parts (plans, calendar, local, did you know) only exist for some destinations (dades/guia.json)
+  // the editorial parts (plans, calendar, local, did you know) only exist for some destinations (dades/guia.json),
+  // and each part is optional
   const G = D.G, f = filter === 'tot' && G;
-  $('guide').innerHTML = (f ? `<p class="lead">${G.intro}</p><h2 class="gsec">Què fer segons el temps que tinguis</h2>${G.plans.map(plan).join('')}` : '')
+  $('guide').innerHTML = (f ? (G.proposta ? '<span class="flag lead-flag">Textos de la guia: proposta nova per revisar</span>' : '')
+      + `<p class="lead">${G.intro}</p>` + (G.plans ? `<h2 class="gsec">Què fer segons el temps que tinguis</h2>${G.plans.map(plan).join('')}` : '') : '')
     + sec('ruta', 'Rutes') + sec('visita', 'Què visitar') + sec('menjar', 'On menjar') + sec('dormir', 'On dormir') + sec('altres', 'Altres serveis')
-    + (f ? calendar() + `<h2 class="gsec">Producte local i on menjar</h2>${steps(G.local.passos)}<div class="draft"><span class="flag">Esborrany per validar amb l'Ajuntament</span>${G.local.esborrany}</div>`
-      + `<div class="know"><h3>Sabies que…?</h3><p>${G.sabies}</p></div>` : '');
+    + (f ? (G.calendari ? calendar() : '')
+      + (G.local ? `<h2 class="gsec">${esc(G.local.titol || 'Producte local i on menjar')}</h2>${steps(G.local.passos)}`
+        + (G.local.esborrany ? `<div class="draft"><span class="flag">Esborrany per validar amb l'Ajuntament</span>${G.local.esborrany}</div>` : '') : '')
+      + (G.sabies ? `<div class="know"><h3>Sabies que…?</h3><p>${G.sabies}</p></div>` : '') : '');
 }
 // «What to do» plans from the first prototype: each one unfolds into an ordered list of places.
 function steps(list) {
@@ -133,8 +137,8 @@ function plan(p) {
 }
 function calendar() {
   const c = D.G.calendari, f = c.fira;
-  return `<h2 class="gsec">Quan anar-hi</h2><article class="fira"><img src="${f.foto}" alt="${esc(f.alt)}" loading="lazy"><div class="pad-s"><span class="flag">${esc(f.quan)}</span><h3>${esc(f.titol)}</h3><p>${esc(f.text)}</p><small>${f.fonts}</small></div></article>
-    <ul class="when">${c.dates.map(([q, t]) => `<li><b>${esc(q)}</b><span>${esc(t)}</span></li>`).join('')}</ul>`;
+  return `<h2 class="gsec">Quan anar-hi</h2>` + (f ? `<article class="fira"><img src="${f.foto}" alt="${esc(f.alt)}" loading="lazy"><div class="pad-s"><span class="flag">${esc(f.quan)}</span><h3>${esc(f.titol)}</h3><p>${esc(f.text)}</p><small>${f.fonts}</small></div></article>` : '')
+    + `<ul class="when">${c.dates.map(([q, t]) => `<li><b>${esc(q)}</b><span>${esc(t)}</span></li>`).join('')}</ul>`;
 }
 $('guide').onclick = e => { const b = e.target.closest('button[data-i]'); if (b) openSheet(+b.dataset.i); };
 
