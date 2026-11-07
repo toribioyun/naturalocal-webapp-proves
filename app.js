@@ -411,7 +411,7 @@ function setFollow(v) { follow = v; $('meBtn').setAttribute('aria-pressed', v); 
 $('meBtn').onclick = () => { if (!me) { fitRoute(); return; } setFollow(!follow); };
 $('rotBtn').onclick = async () => {
   headingUp = !headingUp; $('rotBtn').setAttribute('aria-pressed', headingUp);
-  if (headingUp) await startCompass(); else { view.rot = 0; draw(); }
+  if (headingUp && !simTimer) await startCompass(); else if (!headingUp) { view.rot = 0; draw(); }
 };
 $('layerBtn').onclick = () => {
   ortho = !ortho; $('layerBtn').setAttribute('aria-pressed', ortho); $('layerBtn').textContent = ortho ? 'Mapa' : 'Orto';
@@ -531,6 +531,8 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
   if (me && gpsHeading == null && !compassOn) { const d = dist([me.x, me.y], [x, y]); if (d > 2) heading = (Math.atan2(x - me.x, y - me.y) * 180 / Math.PI + 360) % 360; }
   if (gpsHeading != null && !isNaN(gpsHeading) && !compassOn) heading = gpsHeading;
   me = {x, y, acc: acc || 5};
+  // simulation with the map turned to the walking direction (smoothly), as when walking with the phone in hand
+  if (src === 'sim' && headingUp && heading != null) { const t = heading * Math.PI / 180; let d = t - view.rot; d = Math.atan2(Math.sin(d), Math.cos(d)); view.rot += d * 0.35; }
   const s = snap([x, y]);
   $('offroute').hidden = s.off <= OFFROUTE_M;
   // progress only advances when close to the track, and never jumps more than 120 m at once
@@ -589,21 +591,37 @@ $('gpsBtn').onclick = () => {
     {enableHighAccuracy: true, maximumAge: 2000, timeout: 20000});
   $('gpsBtn').textContent = 'Atura el GPS'; keepAwake(); setFollow(true); log('GPS activat');
 };
-function stopSim() { if (simTimer) { clearInterval(simTimer); simTimer = null; $('simBtn').textContent = 'Simula'; } }
-$('simBtn').onclick = () => {
-  if (simTimer) { stopSim(); return; }
+// Simulation: walks the track by itself (to feel the route from home). Speed ×1 (walking), ×4 or ×10.
+const SPEEDS = [1, 4, 10];
+let simSpeed = 4;
+function stopSim() {
+  if (!simTimer) return;
+  clearInterval(simTimer); simTimer = null; $('simBtn').textContent = 'Simula'; $('speedBtn').hidden = true;
+  if (headingUp && !compassOn) { headingUp = false; $('rotBtn').setAttribute('aria-pressed', false); view.rot = 0; draw(); }
+}
+const simNote = () => { $('gpsNote').textContent = `Simulació: camina sola pel track${simSpeed === 1 ? ' a pas normal' : ` ${simSpeed} vegades més ràpid`}. El mapa gira cap on camines (botó N per treure-ho).`; };
+function startSim() {
+  if (simTimer) return;
   if (gpsWatch != null) $('gpsBtn').click();
-  speak('', true);
-  let along = Math.max(0, walked); started = true;
+  speak('', true); // unlocks speech on iOS (needs a tap)
+  let along = walked >= TOTAL - 1 ? 0 : Math.max(0, walked); started = true;
+  if (along === 0) { maxAlong = walked = 0; visited.clear(); found.clear(); notified.clear(); }
+  headingUp = true; $('rotBtn').setAttribute('aria-pressed', true);
+  view.s = Math.max(view.s, 2.2);
   simTimer = setInterval(() => {
-    along += 1.4 * 4 * 0.5; // walking speed ×4, every 0.5 s
+    along += 1.4 * simSpeed * 0.2; // 1.4 m/s walking, every 0.2 s
     if (along >= TOTAL) { along = TOTAL; stopSim(); }
-    const [lat, lon] = toLL(pointAt(along));
-    onPosition(lat, lon, 5, null, 'sim');
-  }, 500);
-  $('simBtn').textContent = 'Atura'; setFollow(true); keepAwake();
-  $('gpsNote').textContent = 'Simulació: camina sola pel track (4 vegades més ràpid).';
-};
+    const a = pointAt(along), b = pointAt(Math.min(TOTAL, along + 8));
+    const h = (Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+    const [lat, lon] = toLL(a);
+    onPosition(lat, lon, 5, h, 'sim');
+  }, 200);
+  $('simBtn').textContent = 'Atura'; $('speedBtn').hidden = false; $('speedBtn').textContent = '×' + simSpeed;
+  setFollow(true); keepAwake(); simNote(); log('Simulació ×' + simSpeed);
+}
+$('simBtn').onclick = () => simTimer ? stopSim() : startSim();
+$('speedBtn').onclick = () => { simSpeed = SPEEDS[(SPEEDS.indexOf(simSpeed) + 1) % SPEEDS.length]; $('speedBtn').textContent = '×' + simSpeed; simNote(); };
+$('demoBtn').onclick = () => { show(true); history.pushState({nav: 1}, ''); startSim(); };
 // compass (heading-up map)
 let compassOn = false;
 async function startCompass() {

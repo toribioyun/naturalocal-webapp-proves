@@ -2,7 +2,7 @@
 // Cache-first for everything in this folder. Bump VERSION when files change.
 // App, data and map are always saved; media and ortho tiles (zoom ≤ 17) opened online are saved too
 // (nl-rutes), so the route keeps working if coverage is lost without having downloaded it.
-const VERSION = 'v3-20261107';
+const VERSION = 'v4-20261107';
 const SHELL = 'nl-shell-' + VERSION;
 const ROUTES = 'nl-rutes'; // media of downloaded routes (kept across app versions)
 const SHELL_FILES = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest',
