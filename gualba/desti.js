@@ -23,9 +23,12 @@ const GROUPS = {
   altres: {label: 'Altres serveis', col: '#1f6f8b', ink: '#fff'},
 };
 // Icon of each resource: by its name when it says what it is, otherwise by its category.
-const ICON_BY_NAME = [[/esgl[eé]sia|ermita/i, 'religious-christian'], [/pont/i, 'bridge'], [/salt/i, 'waterfall'], [/gorg/i, 'natural'],
-  [/mol[ií]|farga|forn de cal/i, 'town-hall'], [/can figueres/i, 'castle'], [/parc/i, 'park'], [/forn/i, 'bakery'], [/informaci/i, 'information']];
-const ICON_BY_CAT = {arquitectura: 'town-hall', paisatges: 'mountain', indrets: 'viewpoint', menjar: 'restaurant', dormir: 'lodging', 'producte-local': 'shop', 'lleure-actiu': 'park', ruta: 'ruta'};
+const ICON_BY_NAME = [[/esgl[eé]sia|ermita|bas[ií]lica/i, 'religious-christian'], [/pont/i, 'bridge'], [/salt/i, 'waterfall'], [/gorg/i, 'natural'],
+  [/mol[ií]|farga|forn de cal/i, 'town-hall'], [/can figueres/i, 'castle'], [/platg/i, 'beach'], [/port|n[aà]utic/i, 'harbor'], [/museu/i, 'museum'],
+  [/piscina/i, 'swimming'], [/roc[oò]drom/i, 'mountain'], [/mercat/i, 'grocery'], [/c[aà]mping/i, 'campsite'],
+  [/parc/i, 'park'], [/forn/i, 'bakery'], [/informaci/i, 'information']];
+const ICON_BY_CAT = {arquitectura: 'town-hall', paisatges: 'mountain', indrets: 'viewpoint', medi: 'natural', museus: 'museum', altres: 'viewpoint',
+  menjar: 'restaurant', dormir: 'lodging', 'producte-local': 'shop', 'lleure-actiu': 'park', ruta: 'ruta'};
 const GROUP_ICON = {ruta: 'ruta', visita: 'town-hall', menjar: 'restaurant', dormir: 'lodging', altres: 'information'};
 const iconOf = it => it.g === 'ruta' ? 'ruta' : (ICON_BY_NAME.find(([re]) => re.test(it.n)) || [, ICON_BY_CAT[it.cat] || 'viewpoint'])[1];
 const PATHS = Object.fromEntries(Object.entries(ICONS).map(([k, v]) => [k, v.d.map(d => new Path2D(d))]));
@@ -39,7 +42,8 @@ function drawIcon(name, cx, cy, size, col) { // centred on (cx, cy)
   for (const p of PATHS[name]) ctx.fill(p);
   ctx.restore();
 }
-const CAT_NAME = {arquitectura: 'Arquitectura', paisatges: 'Paisatge', indrets: 'Indret', menjar: 'Menjar', dormir: 'Dormir', 'producte-local': 'Producte local', 'lleure-actiu': 'Lleure actiu'};
+const CAT_NAME = {arquitectura: 'Arquitectura', paisatges: 'Paisatge', indrets: 'Indret', medi: 'Medi', museus: 'Museu', altres: 'Indret',
+  menjar: 'Menjar', dormir: 'Dormir', 'producte-local': 'Producte local', 'lleure-actiu': 'Lleure actiu'};
 const NEAR_TRACK = 40;
 let D = null, ITEMS = [], filter = 'tot';
 const colOf = it => it.g === 'ruta' ? it.col : GROUPS[it.g].col;
@@ -111,7 +115,8 @@ function renderGuide() {
       return `<li><button data-i="${it.i}">${th}<span><small>${esc(catLabel(it))}</small><b>${esc(it.n)}</b><span class="sub">${esc(sub)}</span></span><span class="chev">›</span></button></li>`;
     }).join('')}</ul>`;
   };
-  const G = D.G, f = filter === 'tot';
+  // the editorial parts (plans, calendar, local, did you know) only exist for some destinations (dades/guia.json)
+  const G = D.G, f = filter === 'tot' && G;
   $('guide').innerHTML = (f ? `<p class="lead">${G.intro}</p><h2 class="gsec">Què fer segons el temps que tinguis</h2>${G.plans.map(plan).join('')}` : '')
     + sec('ruta', 'Rutes') + sec('visita', 'Què visitar') + sec('menjar', 'On menjar') + sec('dormir', 'On dormir') + sec('altres', 'Altres serveis')
     + (f ? calendar() + `<h2 class="gsec">Producte local i on menjar</h2>${steps(G.local.passos)}<div class="draft"><span class="flag">Esborrany per validar amb l'Ajuntament</span>${G.local.esborrany}</div>`
