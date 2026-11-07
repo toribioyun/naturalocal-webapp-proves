@@ -1,13 +1,19 @@
 /* Natura Local – destination prototype (Gualba): every visit, service and route on one map, plus a guide.
-   Data: data.json (from naturalocal.net, built by scripts/prepara_dades.py). Base map: ICGC topographic map
-   or orthophoto (free, CC BY 4.0), loaded online; sw.js keeps what has been seen. */
+   Data: data.json (from naturalocal.net, built by scripts/prepara_dades.py). Base map: OpenStreetMap, ICGC
+   topographic map or ICGC orthophoto, loaded online; sw.js keeps the ICGC tiles and photos that have been seen.
+   Icons: icones.js (Maki, CC0, and the Natura Local route signpost). */
 'use strict';
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+// OSM tiles: allowed for light use with attribution (operations.osmfoundation.org/policies/tiles);
+// not for heavy traffic or offline download, so the final app needs its own tiles or a provider.
 const LAYERS = {
-  topo: {url: (z, x, y) => `https://geoserveis.icgc.cat/icc_mapesmultibase/noutm/wmts/topo/GRID3857/${z}/${x}/${y}.jpeg`, max: 18},
-  orto: {url: (z, x, y) => `https://geoserveis.icgc.cat/icc_mapesmultibase/noutm/wmts/orto/GRID3857/${z}/${x}/${y}.jpeg`, max: 19},
+  osm: {name: 'OpenStreetMap', url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`, max: 19, attr: '© col·laboradors d’OpenStreetMap'},
+  topo: {name: 'Topogràfic ICGC', url: (z, x, y) => `https://geoserveis.icgc.cat/icc_mapesmultibase/noutm/wmts/topo/GRID3857/${z}/${x}/${y}.jpeg`, max: 18, attr: '© ICGC'},
+  orto: {name: 'Ortofoto ICGC', url: (z, x, y) => `https://geoserveis.icgc.cat/icc_mapesmultibase/noutm/wmts/orto/GRID3857/${z}/${x}/${y}.jpeg`, max: 19, attr: '© ICGC'},
 };
+// One colour per route (pin, line and guide card), distinct from the map colours.
+const ROUTE_COLS = ['#d7263d', '#1b6ca8', '#f46036', '#7b2cbf', '#00838f', '#c2185b', '#2e7d32', '#8d6e00', '#3949ab', '#6d4c41'];
 // Groups shown as filters; services are grouped by their category.
 const GROUPS = {
   ruta: {label: 'Rutes', col: '#69920c', ink: '#fff'},
@@ -16,10 +22,27 @@ const GROUPS = {
   dormir: {label: 'Dormir', col: '#5b4a3b', ink: '#fff'},
   altres: {label: 'Altres serveis', col: '#1f6f8b', ink: '#fff'},
 };
-const ICON = {arquitectura: '🏛', paisatges: '⛰', indrets: '📍', menjar: '🍴', dormir: '🛏', 'producte-local': '🧺', 'lleure-actiu': '🌳', ruta: '🥾'};
+// Icon of each resource: by its name when it says what it is, otherwise by its category.
+const ICON_BY_NAME = [[/esgl[eé]sia|ermita/i, 'religious-christian'], [/pont/i, 'bridge'], [/salt/i, 'waterfall'], [/gorg/i, 'natural'],
+  [/mol[ií]|farga|forn de cal/i, 'town-hall'], [/can figueres/i, 'castle'], [/parc/i, 'park'], [/forn/i, 'bakery'], [/informaci/i, 'information']];
+const ICON_BY_CAT = {arquitectura: 'town-hall', paisatges: 'mountain', indrets: 'viewpoint', menjar: 'restaurant', dormir: 'lodging', 'producte-local': 'shop', 'lleure-actiu': 'park', ruta: 'ruta'};
+const GROUP_ICON = {ruta: 'ruta', visita: 'town-hall', menjar: 'restaurant', dormir: 'lodging', altres: 'information'};
+const iconOf = it => it.g === 'ruta' ? 'ruta' : (ICON_BY_NAME.find(([re]) => re.test(it.n)) || [, ICON_BY_CAT[it.cat] || 'viewpoint'])[1];
+const PATHS = Object.fromEntries(Object.entries(ICONS).map(([k, v]) => [k, v.d.map(d => new Path2D(d))]));
+function svgIcon(name, col = 'currentColor', size = 18) {
+  const ic = ICONS[name], vb = Array.isArray(ic.vb) ? ic.vb.join(' ') : `0 0 ${ic.vb} ${ic.vb}`;
+  return `<svg class="ico" viewBox="${vb}" width="${size}" height="${size}" aria-hidden="true">${ic.d.map(d => `<path d="${d}" fill="${col}"/>`).join('')}</svg>`;
+}
+function drawIcon(name, cx, cy, size, col) { // centred on (cx, cy)
+  const ic = ICONS[name], [x0, y0, w, h] = Array.isArray(ic.vb) ? ic.vb : [0, 0, ic.vb, ic.vb], k = size / Math.max(w, h);
+  ctx.save(); ctx.translate(cx - w * k / 2, cy - h * k / 2); ctx.scale(k, k); ctx.translate(-x0, -y0); ctx.fillStyle = col;
+  for (const p of PATHS[name]) ctx.fill(p);
+  ctx.restore();
+}
 const CAT_NAME = {arquitectura: 'Arquitectura', paisatges: 'Paisatge', indrets: 'Indret', menjar: 'Menjar', dormir: 'Dormir', 'producte-local': 'Producte local', 'lleure-actiu': 'Lleure actiu'};
 const NEAR_TRACK = 40;
 let D = null, ITEMS = [], filter = 'tot';
+const colOf = it => it.g === 'ruta' ? it.col : GROUPS[it.g].col;
 
 /* ---------- connection ---------- */
 function updateNet() { const on = navigator.onLine; $('net').textContent = on ? 'Amb connexió' : 'Sense connexió'; $('net').classList.toggle('off', !on); }
@@ -43,7 +66,7 @@ function prepare() {
   KX = 111320 * Math.cos(LAT0 * Math.PI / 180);
   const svc = c => c === 'menjar' || c === 'dormir' ? c : 'altres';
   ITEMS = [
-    ...D.R.map(r => ({...r, g: 'ruta', cat: 'ruta'})),
+    ...D.R.map((r, k) => ({...r, g: 'ruta', cat: 'ruta', col: ROUTE_COLS[k % ROUTE_COLS.length]})),
     ...D.V.map(v => ({...v, g: 'visita'})),
     ...D.S.map(s => ({...s, g: svc(s.cat)})),
   ].map((it, i) => {
@@ -54,13 +77,14 @@ function prepare() {
 }
 const shown = it => filter === 'tot' || it.g === filter;
 const catLabel = it => it.g === 'ruta' ? 'Ruta' : CAT_NAME[it.cat] || it.cat;
+const byName = Object.create(null);
 const plain = html => { const t = document.createElement('div'); t.innerHTML = html; return t.textContent.trim(); };
 
 /* ---------- filters ---------- */
 function renderChips() {
   const n = g => ITEMS.filter(i => i.g === g).length;
   $('chips').innerHTML = [['tot', 'Tot', ITEMS.length], ...Object.entries(GROUPS).map(([g, v]) => [g, v.label, n(g)])]
-    .filter(c => c[2]).map(([g, l, c]) => `<button data-g="${g}" aria-pressed="${g === filter}">${g === 'tot' ? '' : (ICON[g] || (g === 'visita' ? '🏛' : 'ℹ')) + ' '}${l}<small>${c}</small></button>`).join('');
+    .filter(c => c[2]).map(([g, l, c]) => `<button data-g="${g}" aria-pressed="${g === filter}">${g === 'tot' ? '' : `<span class="dot" style="background:${GROUPS[g].col}">${svgIcon(GROUP_ICON[g], '#fff', 12)}</span>`}${l}<small>${c}</small></button>`).join('');
 }
 $('chips').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -81,12 +105,31 @@ function renderGuide() {
   const sec = (g, title) => {
     const list = ITEMS.filter(i => i.g === g && shown(i)); if (!list.length) return '';
     return `<h2 class="gsec">${title}<small>${list.length}</small></h2><ul class="cards">${list.map(it => {
-      const th = it.pics[0] ? `<img src="${it.pics[0][0]}" alt="" loading="lazy">` : `<span class="ph">${ICON[it.cat] || '•'}</span>`;
+      const th = it.pics[0] ? `<span class="thw"><img src="${it.pics[0][0]}" alt="" loading="lazy"><span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 13)}</span></span>`
+        : `<span class="ph" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 32)}</span>`;
       const sub = it.g === 'ruta' ? [it.km + ' km', it.dur, it.dif].join(' · ') : plain(it.desc[0] || '').slice(0, 70) + '…';
       return `<li><button data-i="${it.i}">${th}<span><small>${esc(catLabel(it))}</small><b>${esc(it.n)}</b><span class="sub">${esc(sub)}</span></span><span class="chev">›</span></button></li>`;
     }).join('')}</ul>`;
   };
-  $('guide').innerHTML = sec('ruta', 'Rutes') + sec('visita', 'Què visitar') + sec('menjar', 'On menjar') + sec('dormir', 'On dormir') + sec('altres', 'Altres serveis');
+  const G = D.G, f = filter === 'tot';
+  $('guide').innerHTML = (f ? `<p class="lead">${G.intro}</p><h2 class="gsec">Què fer segons el temps que tinguis</h2>${G.plans.map(plan).join('')}` : '')
+    + sec('ruta', 'Rutes') + sec('visita', 'Què visitar') + sec('menjar', 'On menjar') + sec('dormir', 'On dormir') + sec('altres', 'Altres serveis')
+    + (f ? calendar() + `<h2 class="gsec">Producte local i on menjar</h2>${steps(G.local.passos)}<div class="draft"><span class="flag">Esborrany per validar amb l'Ajuntament</span>${G.local.esborrany}</div>`
+      + `<div class="know"><h3>Sabies que…?</h3><p>${G.sabies}</p></div>` : '');
+}
+// «What to do» plans from the first prototype: each one unfolds into an ordered list of places.
+function steps(list) {
+  return `<ol class="steps">${list.map(([name, note], k) => { const it = byName[name];
+    return `<li><button data-i="${it.i}"><span class="n">${k + 1}</span><span class="ph sm" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 16)}</span><span><b>${esc(it.n)}</b><span class="sub">${esc(note)}</span></span><span class="chev">›</span></button></li>`; }).join('')}</ol>`;
+}
+function plan(p) {
+  return `<details class="plan"><summary><span class="badge">${esc(p.badge)}</span><span class="pt">${esc(p.titol)}</span><span class="chev">⌄</span></summary>
+    ${p.proposta ? '<span class="flag">Proposta nova per revisar</span>' : ''}<p class="muted">${esc(p.intro)}</p>${steps(p.passos)}</details>`;
+}
+function calendar() {
+  const c = D.G.calendari, f = c.fira;
+  return `<h2 class="gsec">Quan anar-hi</h2><article class="fira"><img src="${f.foto}" alt="${esc(f.alt)}" loading="lazy"><div class="pad-s"><span class="flag">${esc(f.quan)}</span><h3>${esc(f.titol)}</h3><p>${esc(f.text)}</p><small>${f.fonts}</small></div></article>
+    <ul class="when">${c.dates.map(([q, t]) => `<li><b>${esc(q)}</b><span>${esc(t)}</span></li>`).join('')}</ul>`;
 }
 $('guide').onclick = e => { const b = e.target.closest('button[data-i]'); if (b) openSheet(+b.dataset.i); };
 
@@ -95,7 +138,7 @@ function openSheet(i) {
   const it = ITEMS[i];
   gallery($('shGal'), it.pics);
   $('shCount').hidden = it.pics.length < 2; $('shCount').textContent = `1 / ${it.pics.length}`;
-  $('shTheme').textContent = (ICON[it.cat] || '') + ' ' + catLabel(it);
+  $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}`;
   $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [it.x, it.y])) + ' de tu' : '';
   $('shTitle').textContent = it.n;
   const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada', it.dur], ['Desnivell', it.des], ['Dificultat', it.dif], ['Tipologia', it.tip]].filter(f => f[1]) : [];
@@ -168,11 +211,11 @@ function paint() {
   // routes: all thin when routes are shown, the selected one gold with direction arrows
   // while navigating, the other routes are hidden so the map stays clean
   const routes = nav ? [] : ITEMS.filter(i => i.g === 'ruta' && shown(i));
-  for (const r of routes) if (r !== sel) { pathOf(r.tr); ctx.strokeStyle = '#fffc'; ctx.lineWidth = 5; ctx.stroke(); ctx.strokeStyle = '#69920c'; ctx.lineWidth = 2.5; ctx.stroke(); }
+  for (const r of routes) if (r !== sel) { pathOf(r.tr); ctx.strokeStyle = '#fffd'; ctx.lineWidth = 6.5; ctx.stroke(); ctx.strokeStyle = r.col; ctx.lineWidth = 3.5; ctx.stroke(); }
   if (sel && sel.tr) {
-    pathOf(sel.tr); ctx.strokeStyle = '#322820'; ctx.lineWidth = 9; ctx.stroke(); ctx.strokeStyle = '#e9bc00'; ctx.lineWidth = 5.5; ctx.stroke();
+    pathOf(sel.tr); ctx.strokeStyle = '#fff'; ctx.lineWidth = 11; ctx.stroke(); ctx.strokeStyle = sel.col; ctx.lineWidth = 6.5; ctx.stroke();
     if (walked > 0 && nav === sel) { ctx.beginPath(); let first = true; for (let k = 0; k < sel.tr.length && sel.cum[k] <= walked; k++) { const [x, y] = w2s(...sel.tr[k]); first ? ctx.moveTo(x, y) : ctx.lineTo(x, y); first = false; } ctx.lineTo(...w2s(...at(sel, walked))); ctx.strokeStyle = '#69920c'; ctx.lineWidth = 5.5; ctx.stroke(); }
-    ctx.strokeStyle = '#322820'; ctx.lineWidth = 2.6;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.6;
     for (let d = 27 / view.s; d < sel.len; d += 55 / view.s) {
       const a = w2s(...at(sel, d)), b = w2s(...at(sel, Math.min(sel.len, d + 2)));
       if (a[0] < -20 || a[1] < -20 || a[0] > W + 20 || a[1] > H + 20) continue;
@@ -183,14 +226,13 @@ function paint() {
   // pins (routes at their start); the selected one bigger and on top
   const pins = ITEMS.filter(i => (shown(i) && !(nav && i.g === 'ruta')) || i === sel).sort((a, b) => (a === sel) - (b === sel) || b.y - a.y);
   for (const it of pins) {
-    const [x, y] = w2s(it.x, it.y), k = it === sel ? 1.3 : 1, g = GROUPS[it.g];
+    const [x, y] = w2s(it.x, it.y), k = it === sel ? 1.3 : 1;
     if (x < -30 || y < -10 || x > W + 30 || y > H + 50) continue;
     ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(-5, -9, -14, -14, -14, -24); ctx.arc(0, -24, 14, Math.PI, 0); ctx.bezierCurveTo(14, -14, 5, -9, 0, 0); ctx.closePath();
-    ctx.shadowColor = '#0006'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1; ctx.fillStyle = g.col; ctx.fill(); ctx.shadowColor = 'transparent';
+    ctx.shadowColor = '#0006'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1; ctx.fillStyle = colOf(it); ctx.fill(); ctx.shadowColor = 'transparent';
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.font = '14px system-ui,"Segoe UI Emoji","Apple Color Emoji",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(ICON[it.cat] || '•', 0, -23); ctx.restore();
+    drawIcon(iconOf(it), 0, -24, 16, '#fff'); ctx.restore();
   }
   if (me) {
     const [x, y] = w2s(me.x, me.y);
@@ -207,10 +249,13 @@ function fit(pts, pad = 60) {
 const fitAll = () => fit(ITEMS.flatMap(i => i.tr ? [[i.x, i.y], ...i.tr] : [[i.x, i.y]]), 30);
 function zoom(f, sx = W / 2, sy = H / 2) { const a = s2w(sx, sy); view.s = Math.max(0.01, Math.min(8, view.s * f)); const b = s2w(sx, sy); view.cx += a[0] - b[0]; view.cy += a[1] - b[1]; draw(); }
 $('zin').onclick = () => zoom(1.6); $('zout').onclick = () => zoom(1 / 1.6);
-$('layerBtn').onclick = () => {
-  layer = layer === 'topo' ? 'orto' : 'topo';
-  $('layerBtn').textContent = layer === 'orto' ? 'Mapa' : 'Orto'; $('layerBtn').setAttribute('aria-pressed', layer === 'orto'); draw();
-};
+$('layerBtn').onclick = () => { $('layerMenu').hidden = !$('layerMenu').hidden; };
+function setLayer(l) {
+  layer = l; $('attr').textContent = LAYERS[l].attr; $('layerMenu').hidden = true;
+  $('layerMenu').innerHTML = Object.entries(LAYERS).map(([k, v]) => `<button data-l="${k}" aria-pressed="${k === l}">${v.name}</button>`).join('');
+  draw();
+}
+$('layerMenu').onclick = e => { const b = e.target.closest('button'); if (b) setLayer(b.dataset.l); };
 // gestures
 const ptrs = new Map(); let pinch0 = null, downXY = null, downAt = 0;
 cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.offsetX, e.offsetY]); downXY = [e.offsetX, e.offsetY]; downAt = Date.now(); if (ptrs.size === 2) pinch0 = {d: pinchDist(), s: view.s}; });
@@ -239,7 +284,7 @@ function showPop(it) {
   sel = it; const p = $('pop');
   const d = me ? ' · a ' + fmtM(dist([me.x, me.y], [it.x, it.y])) : '';
   const txt = it.g === 'ruta' ? [it.km + ' km', it.dur, it.des, it.dif].join(' · ') : plain(it.desc[0] || '').slice(0, 140);
-  p.innerHTML = `<span class="t">${ICON[it.cat] || ''} ${esc(catLabel(it))}${d}</span><h3>${esc(it.n)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}
+  p.innerHTML = `<span class="t"><span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}${d}</span><h3>${esc(it.n)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}
     <div class="row"><button class="primary grow" id="pMore">Més informació ›</button>${it.g === 'ruta' ? '<button id="pNav">Navega</button>' : ''}<button id="pClose" aria-label="Tanca">×</button></div>`;
   p.hidden = nav != null;
   $('pMore').onclick = () => openSheet(it.i);
@@ -307,7 +352,8 @@ function simulate() {
   updateNet();
   try { D = await fetch('data.json').then(r => r.json()); }
   catch (e) { document.body.insertAdjacentHTML('beforeend', '<p class="miss pad">No s\'han pogut carregar les dades. Obre-la amb connexió la primera vegada.</p>'); return; }
-  prepare();
+  prepare(); for (const it of ITEMS) byName[it.n] = it;
+  setLayer('osm');
   $('dName').textContent = D.D.nom; document.title = 'Natura Local · ' + D.D.nom;
   gallery($('dGal'), D.D.pics);
   renderChips(); renderGuide();

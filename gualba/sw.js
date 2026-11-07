@@ -1,8 +1,8 @@
 // Service worker of the Gualba destination prototype. Bump VERSION when files change.
 // App and data are saved on install; photos and ICGC map tiles (zoom ≤ 16) are saved as they are seen.
-const VERSION = 'd1-20261107';
+const VERSION = 'd2-20261107';
 const SHELL = 'nlg-shell-' + VERSION, SEEN = 'nlg-vist';
-const SHELL_FILES = ['./', 'index.html', 'desti.js', 'style.css', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
+const SHELL_FILES = ['./', 'index.html', 'desti.js', 'style.css', 'manifest.webmanifest', 'icones.js', 'icon-192.png', 'icon-512.png',
   'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2', 'fonts/raleway-latin-ext.woff2', 'data.json'];
 const TILE_HOST = 'geoserveis.icgc.cat', TILE_SAVE_MAX_Z = 16;
 

@@ -22,21 +22,18 @@
     <span class="proto">Prototip</span>
     <span id="net" class="net" aria-live="polite"></span>
   </header>
-  <nav class="tabs" role="tablist">
-    <button id="tMapa" role="tab" aria-selected="true">Mapa</button>
-    <button id="tGuia" role="tab" aria-selected="false">Guia</button>
-  </nav>
   <div class="chips" id="chips" role="group" aria-label="Què vols veure"></div>
 
   <!-- Map with every resource of the destination -->
   <section id="vMapa" class="view" role="tabpanel">
     <canvas id="map" aria-label="Mapa de Gualba amb visites, serveis i rutes"></canvas>
     <div class="mapbtns">
-      <button id="layerBtn" class="layer" aria-pressed="false" title="Canvia entre mapa topogràfic i ortofoto">Orto</button>
+      <button id="layerBtn" class="layer" title="Tria el mapa de fons">Capes</button>
       <button id="zin" aria-label="Apropa">+</button>
       <button id="zout" aria-label="Allunya">−</button>
       <button id="meBtn" aria-pressed="false" title="On soc">◎</button>
     </div>
+    <div id="layerMenu" class="layermenu" hidden></div>
     <div id="navBar" class="navbar" hidden>
       <div class="navbar-top"><span class="t">Navegant</span><strong id="navName"></strong><button id="simBtn" class="small">Simula</button><button id="navStop" class="small">Surt</button></div>
       <div class="bar"><i id="progBar"></i></div>
@@ -62,8 +59,13 @@
       </div>
     </div>
     <div class="pad" id="guide"></div>
-    <p class="foot pad">Mapa i ortofoto: © Institut Cartogràfic i Geològic de Catalunya (CC BY 4.0). Continguts: Natura Local.</p>
+    <p class="foot pad">Mapes: © col·laboradors d'OpenStreetMap (ODbL) · © Institut Cartogràfic i Geològic de Catalunya (CC BY 4.0). Icones: Maki (CC0). Continguts: Natura Local.</p>
   </section>
+  <!-- Bottom tab bar: the usual mobile pattern, so it reads as buttons -->
+  <nav class="tabbar" role="tablist" aria-label="Vistes">
+    <button id="tMapa" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M9 3 3 5.5v15.5l6-2.5 6 2.5 6-2.5V3l-6 2.5zm0 2.2 6 2.5v11.1l-6-2.5zM5 6.8l2-.8v11.1l-2 .8zm12 .2 2-.8v11.1l-2 .8z" fill="currentColor"/></svg>Mapa</button>
+    <button id="tGuia" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M4 5h2v2H4zm4 0h12v2H8zM4 11h2v2H4zm4 0h12v2H8zm-4 6h2v2H4zm4 0h12v2H8z" fill="currentColor"/></svg>Guia</button>
+  </nav>
 </div>
 
 <!-- Detail sheet -->
@@ -84,6 +86,7 @@
   </div>
 </div>
 
+<script src="icones.js"></script>
 <script src="desti.js"></script>
 </body>
 </html>
