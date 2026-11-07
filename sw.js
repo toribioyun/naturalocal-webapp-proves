@@ -1,12 +1,14 @@
 // Service worker: keeps the app and the downloaded route available without connection.
 // Cache-first for everything in this folder. Bump VERSION when files change.
-// App, data and map are always saved; media opened online is saved too (nl-rutes),
-// so the route keeps working if coverage is lost without having downloaded it.
-const VERSION = 'v2-20261102';
+// App, data and map are always saved; media and ortho tiles (zoom ≤ 17) opened online are saved too
+// (nl-rutes), so the route keeps working if coverage is lost without having downloaded it.
+const VERSION = 'v3-20261107';
 const SHELL = 'nl-shell-' + VERSION;
 const ROUTES = 'nl-rutes'; // media of downloaded routes (kept across app versions)
 const SHELL_FILES = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest',
-  'icon-192.png', 'icon-512.png', 'data.json', 'basemap.json'];
+  'icon-192.png', 'icon-512.png', 'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2',
+  'fonts/raleway-latin-ext.woff2', 'data.json', 'basemap.json'];
+const ORTO_HOST = 'geoserveis.icgc.cat', ORTO_SAVE_MAX_Z = 17;
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
@@ -19,7 +21,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);
-  if (req.method !== 'GET' || url.origin !== location.origin) return;
+  const orto = url.hostname === ORTO_HOST;
+  if (req.method !== 'GET' || (url.origin !== location.origin && !orto)) return;
   e.respondWith((async () => {
     const hit = await caches.match(req.url, {ignoreSearch: true});
     if (hit) return serve(hit, req);
@@ -30,6 +33,12 @@ self.addEventListener('fetch', e => {
         if (!res.ok) return res;
         await (await caches.open(ROUTES)).put(req.url, res.clone());
         return serve(res, req);
+      }
+      if (orto) {
+        const res = await fetch(req);
+        const z = Number(url.pathname.split('/').slice(-3)[0]);
+        if (res.ok && z <= ORTO_SAVE_MAX_Z) await (await caches.open(ROUTES)).put(req.url, res.clone());
+        return res;
       }
       return await fetch(req);
     } catch (err) {

@@ -5,48 +5,53 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Natura Local · Parc Mataró</title>
 <meta name="description" content="Prototip de web app de Natura Local que funciona sense cobertura.">
-<meta name="theme-color" content="#2f7d4f">
+<meta name="theme-color" content="#322820">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Natura Local">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon-192.png">
+<link rel="icon" href="fulla.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<!-- Home: route card, offline download, list of points -->
+<!-- Home: route card, how to do it (online / downloaded), list of points -->
 <main id="home" class="screen">
-  <header class="top">
-    <div class="brand">Natura Local</div>
+  <header class="appbar">
+    <img src="logo.svg" alt="Natura Local" class="logo">
     <span class="proto">Prototip</span>
     <span id="net" class="net" aria-live="polite"></span>
   </header>
-  <div class="hero"><img id="heroImg" alt=""></div>
-  <section class="pad">
-    <h1 id="rTitle"></h1>
-    <ul class="chips" id="rStats"></ul>
-
-    <div class="offline" id="offBox">
-      <div class="offline-head">
-        <strong>Com vols fer la ruta?</strong>
-        <span id="offState" class="pill">Comprovant…</span>
-      </div>
-      <p class="muted"><b>Amb cobertura:</b> prem «Comença la ruta» sense descarregar res. Gasta dades mòbils (<span class="mb">uns 8 MB</span>). Si perds la cobertura, el mapa, el GPS i els avisos continuen funcionant, i el que ja hagis obert també; només falten les fotos, els àudios i els vídeos que encara no has vist.</p>
-      <p class="muted"><b>Sense cobertura:</b> descarrega-la abans de sortir, amb connexió (<span class="mb">uns 8 MB</span>), i la podràs fer tota en mode avió.</p>
-      <p id="offText"></p>
-      <div class="bar"><i id="offBar"></i></div>
-      <div class="row">
-        <button id="dlBtn" class="primary">Descarrega la ruta</button>
-        <button id="installBtn" hidden>Instal·la l'app</button>
-      </div>
-      <p id="iosHint" class="hint" hidden>A l'iPhone: botó <b>Compartir</b> → <b>Afegeix a la pantalla d'inici</b>. Obre-la sempre des de la icona.</p>
+  <div class="hero">
+    <img id="heroImg" alt="">
+    <div class="hero-txt">
+      <span class="kind"><img src="fulla.svg" alt=""> Ruta</span>
+      <h1 id="rTitle"></h1>
     </div>
+  </div>
+  <section class="pad">
+    <dl class="facts" id="rStats"></dl>
 
     <button id="startBtn" class="big primary">Comença la ruta</button>
+    <p class="cta-note">Amb cobertura no cal descarregar res (gasta <span class="mbOnline">uns 8 MB</span> de dades). Si la perds a mig camí, el mapa, el GPS i els avisos continuen funcionant.</p>
 
-    <h2>Punts de la ruta</h2>
+    <div class="box" id="offBox">
+      <div class="box-head">
+        <strong>Vas a un lloc sense cobertura?</strong>
+        <span id="offState" class="pill info">Comprovant…</span>
+      </div>
+      <p class="muted">Descarrega-la ara, amb connexió, i la podràs fer tota en mode avió: mapa, ortofoto, fotos, àudios i vídeos.</p>
+      <p id="offText" hidden></p>
+      <div class="bar"><i id="offBar"></i></div>
+      <div class="row">
+        <button id="dlBtn">Descarrega la ruta</button>
+        <button id="installBtn" hidden>Instal·la l'app</button>
+      </div>
+      <p id="iosHint" class="hint" hidden>A l'iPhone: botó <b>Compartir</b> → <b>Afegeix a la pantalla d'inici</b>. Obre-la sempre des de la icona; si no, l'iPhone pot esborrar la descàrrega.</p>
+    </div>
+
+    <h2 class="sec">Què hi ha?</h2>
     <ol class="poilist" id="poiList"></ol>
 
     <details class="diag">
@@ -55,7 +60,7 @@
       <pre id="diagLog"></pre>
       <div class="row"><button id="copyDiag">Copia l'informe</button><button id="resetBtn">Esborra la descàrrega</button></div>
     </details>
-    <p class="foot muted">Mapa: © col·laboradors d'OpenStreetMap (ODbL). Continguts: Natura Local.</p>
+    <p class="foot">Mapa: © col·laboradors d'OpenStreetMap (ODbL). Ortofoto: © Institut Cartogràfic i Geològic de Catalunya (CC BY 4.0). Continguts: Natura Local.</p>
   </section>
 </main>
 
@@ -64,10 +69,12 @@
   <div class="mapwrap">
     <canvas id="map" aria-label="Mapa de la ruta"></canvas>
     <div class="maptop">
-      <button id="backBtn" class="round" aria-label="Torna">‹</button>
+      <button id="backBtn" class="round" aria-label="Torna a la fitxa de la ruta">‹</button>
       <span id="net2" class="net"></span>
+      <button id="fullBtn" class="round" aria-pressed="false" aria-label="Pantalla completa" title="Pantalla completa">⤢</button>
     </div>
     <div class="mapbtns">
+      <button id="layerBtn" class="layer" aria-pressed="false" title="Canvia entre mapa i ortofoto">Orto</button>
       <button id="zin" aria-label="Apropa">+</button>
       <button id="zout" aria-label="Allunya">−</button>
       <button id="rotBtn" aria-pressed="false" title="Mapa orientat cap on mires">N</button>
@@ -75,18 +82,28 @@
     </div>
     <div id="offroute" class="offroute" hidden>Fora de la ruta</div>
     <div id="toast" class="toast" hidden></div>
-    <div class="attr">© OpenStreetMap</div>
+    <button id="miniBar" class="minibar" hidden aria-label="Mostra el panell de la ruta">
+      <span class="badge" id="mBadge">1</span>
+      <span class="mtxt"><strong id="mName"></strong><small id="mDist"></small></span>
+      <span class="mopen">⌃</span>
+    </button>
+    <div id="attr" class="attr">© OpenStreetMap</div>
   </div>
-  <div class="card">
+  <div class="card" id="navCard">
     <div class="bar"><i id="progBar"></i></div>
     <div class="stats">
       <div class="stat"><b id="sDone">0 m</b><span>Fet</span></div>
       <div class="stat"><b id="sLeft">–</b><span>Falta</span></div>
+      <div class="stat"><b id="sEle">–</b><span>Altitud</span></div>
       <div class="stat"><b id="sTre">0/0</b><span>Tresors</span></div>
     </div>
-    <button class="next" id="nextBtn"><span class="badge" id="nBadge">1</span><span><small id="nDist">Següent punt</small><strong id="nName"></strong></span></button>
+    <button class="next" id="nextBtn"><span class="badge" id="nBadge">1</span><span><small id="nDist">Següent punt</small><strong id="nName"></strong></span><span class="chev">›</span></button>
+    <details id="profBox" class="prof">
+      <summary>Perfil de desnivell <span id="profSum" class="muted"></span></summary>
+      <canvas id="prof" aria-label="Perfil de desnivell de la ruta"></canvas>
+    </details>
     <div class="row">
-      <button id="gpsBtn" class="primary">Activa el GPS</button>
+      <button id="gpsBtn" class="primary grow">Activa el GPS</button>
       <button id="voiceBtn" aria-pressed="true">Veu: sí</button>
       <button id="simBtn">Simula</button>
     </div>
@@ -97,16 +114,24 @@
 <!-- Point sheet -->
 <div id="sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="shTitle">
   <div class="sheet-in">
-    <button id="shClose" class="round close" aria-label="Tanca">×</button>
-    <div class="gallery" id="shGal"></div>
+    <div class="gal-wrap">
+      <div class="gallery" id="shGal"></div>
+      <span id="shCount" class="gcount" hidden></span>
+      <button id="shClose" class="round close" aria-label="Tanca">×</button>
+    </div>
     <div class="pad">
-      <small id="shTheme" class="theme"></small>
+      <div class="sh-meta"><span id="shTheme" class="theme"></span><span id="shDist" class="dist"></span></div>
+      <div id="shCountM" class="mcount"></div>
       <h2 id="shTitle"></h2>
       <p id="shMiss" class="miss" hidden></p>
-      <div class="row" id="shActions"></div>
-      <audio id="shAudio" controls preload="none" hidden></audio>
+      <div id="shAudioBox" class="media" hidden><span class="mlabel">Escolta</span><audio id="shAudio" controls preload="none"></audio></div>
       <video id="shVideo" controls playsinline preload="none" hidden></video>
+      <div class="row" id="shActions"></div>
       <div id="shBody" class="body"></div>
+    </div>
+    <div class="sh-nav">
+      <button id="shPrev">‹ Anterior</button>
+      <button id="shNext">Següent ›</button>
     </div>
   </div>
 </div>

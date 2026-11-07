@@ -1,11 +1,14 @@
 /* Natura Local – offline route prototype (Parc Mataró gamificada).
-   Data: data.json (route + points, from naturalocal.net) and basemap.json (OpenStreetMap ways).
-   Two ways: online (no download; sw.js saves app, data, map and every media file opened)
-   or downloaded ("Descarrega la ruta" puts all media in the cache before leaving). */
+   Data: data.json (route + points + elevation, from naturalocal.net) and basemap.json (OpenStreetMap ways).
+   Two ways: online (no download; sw.js saves app, data, map and every media file or ortho tile opened)
+   or downloaded ("Descarrega la ruta" puts all media and the ortho tiles in the cache before leaving). */
 'use strict';
 const $ = id => document.getElementById(id);
 const MEDIA_CACHE = 'nl-rutes';
 const NEAR_M = 20, TREASURE_M = 15, OFFROUTE_M = 40;
+// Free orthophoto of the ICGC (CC BY 4.0). Zooms 14–17 go in the download; 18–19 only online.
+const ORTO_URL = (z, x, y) => `https://geoserveis.icgc.cat/icc_mapesmultibase/noutm/wmts/orto/GRID3857/${z}/${x}/${y}.jpeg`;
+const ORTO_DL_Z = [14, 15, 16, 17], ORTO_MAX_Z = 19, ORTO_KB = 30;
 let D = null, BASE = null;
 
 /* ---------- diagnostics log ---------- */
@@ -27,7 +30,7 @@ function updateNet() {
     el.classList.toggle('off', !on);
   }
 }
-addEventListener('online', () => { updateNet(); log('Connexió: sí'); if (D) checkOffline(); });
+addEventListener('online', () => { updateNet(); log('Connexió: sí'); tiles.clear(); draw(); if (D) checkOffline(); });
 addEventListener('offline', () => { updateNet(); log('Connexió: no'); if (D) checkOffline(); });
 // Images that can't load (offline and not saved) are hidden instead of showing a broken icon.
 document.addEventListener('error', e => {
@@ -58,12 +61,14 @@ if ('serviceWorker' in navigator) {
 let LAT0 = 0, LON0 = 0, KX = 0;
 const KY = 110574;
 const toXY = (lat, lon) => [(lon - LON0) * KX, (lat - LAT0) * KY];
+const toLL = ([x, y]) => [y / KY + LAT0, x / KX + LON0];
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 function fmtM(m) { return m >= 1000 ? (m / 1000).toFixed(2).replace('.', ',') + ' km' : Math.round(m) + ' m'; }
 
-let TR = [], CUM = [], TOTAL = 0;
+let TR = [], CUM = [], ELE = [], TOTAL = 0;
 function prepTrack() {
   TR = D.route.track.map(p => toXY(p[0], p[1]));
+  ELE = D.route.ele || [];
   CUM = [0];
   for (let i = 1; i < TR.length; i++) CUM.push(CUM[i - 1] + dist(TR[i - 1], TR[i]));
   TOTAL = CUM[CUM.length - 1];
@@ -79,13 +84,16 @@ function snap(p) {
   }
   return best;
 }
-function pointAt(along) {
+// Point (and elevation) at a distance along the track.
+function at(along) {
   for (let i = 1; i < TR.length; i++) if (CUM[i] >= along) {
     const t = (along - CUM[i - 1]) / ((CUM[i] - CUM[i - 1]) || 1);
-    return [TR[i - 1][0] + t * (TR[i][0] - TR[i - 1][0]), TR[i - 1][1] + t * (TR[i][1] - TR[i - 1][1])];
+    return {pt: [TR[i - 1][0] + t * (TR[i][0] - TR[i - 1][0]), TR[i - 1][1] + t * (TR[i][1] - TR[i - 1][1])],
+      ele: ELE.length ? ELE[i - 1] + t * (ELE[i] - ELE[i - 1]) : null, i};
   }
-  return TR[TR.length - 1];
+  return {pt: TR[TR.length - 1], ele: ELE[ELE.length - 1] ?? null, i: TR.length - 1};
 }
+const pointAt = along => at(along).pt;
 
 /* ---------- points ---------- */
 let POIS = [];
@@ -100,25 +108,47 @@ function mediaList() {
   return [...s];
 }
 
+/* ---------- orthophoto tiles ---------- */
+const lon2tx = (lon, z) => (lon + 180) / 360 * 2 ** z;
+const lat2ty = (lat, z) => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z; };
+const tx2lon = (x, z) => x / 2 ** z * 360 - 180;
+const ty2lat = (y, z) => { const n = Math.PI - 2 * Math.PI * y / 2 ** z; return 180 / Math.PI * Math.atan(Math.sinh(n)); };
+// Tiles covering the route (with a 150 m margin), for the download.
+function orthoList() {
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const p of [...TR, ...POIS.map(p => [p.x, p.y])]) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+  const [la0, lo0] = toLL([x0 - 150, y0 - 150]), [la1, lo1] = toLL([x1 + 150, y1 + 150]);
+  const out = [];
+  for (const z of ORTO_DL_Z)
+    for (let x = Math.floor(lon2tx(lo0, z)); x <= Math.floor(lon2tx(lo1, z)); x++)
+      for (let y = Math.floor(lat2ty(la1, z)); y <= Math.floor(lat2ty(la0, z)); y++) out.push(ORTO_URL(z, x, y));
+  return out;
+}
+const downloadList = () => [...mediaList(), ...orthoList()];
+
 /* ---------- home ---------- */
 function renderHome() {
   const r = D.route;
   $('rTitle').textContent = r.name;
   $('heroImg').src = 'media/' + r.imgs[0];
-  const chips = [r.distancia.replace('.00', ''), r.durada, 'Desnivell ' + r.desnivell.replace('.00', '').replace(' meters', ' m'), r.dificultat, r.tipus].filter(Boolean);
-  $('rStats').innerHTML = chips.map(c => `<li>${esc(c)}</li>`).join('');
+  const facts = [['Distància', r.distancia.replace('.00', '').replace('.', ',')], ['Durada', r.durada],
+    ['Desnivell', r.desnivell.replace('.00', '').replace(' meters', ' m')], ['Dificultat', r.dificultat],
+    ['Tipologia', r.tipus], ['Tema', r.tema]].filter(f => f[1]);
+  $('rStats').innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   $('poiList').innerHTML = POIS.map((p, i) => {
-    const img = p.imgs[0] ? `<img src="media/${p.imgs[0]}" alt="" loading="lazy">` : `<span class="ph">${isTreasure(p) ? '★' : '•'}</span>`;
-    const extra = [p.theme, p.audio.length ? 'àudio' : '', p.video.length ? 'vídeo' : ''].filter(Boolean).join(' · ');
-    return `<li><button data-i="${i}">${img}<span><b>${i + 1}. ${esc(p.name)}</b><small>${esc(extra)}</small></span></button></li>`;
+    const th = p.imgs[0] ? `<img src="media/${p.imgs[0]}" alt="" loading="lazy">` : `<span class="ph">${isTreasure(p) ? '★' : '•'}</span>`;
+    const extra = [p.theme || (isTreasure(p) ? 'Tresor' : ''), p.audio.length ? 'àudio' : '', p.video.length ? 'vídeo' : ''].filter(Boolean).join(' · ');
+    return `<li><button data-i="${i}"><span class="th">${th}<span class="num">${isTreasure(p) ? '★' : i + 1}</span></span><span><small>${esc(extra)}</small><b>${esc(p.name)}</b></span><span class="chev">›</span></button></li>`;
   }).join('');
   $('poiList').onclick = e => { const b = e.target.closest('button'); if (b) openSheet(+b.dataset.i); };
+  const mb = (8 + orthoList().length * ORTO_KB / 1000).toFixed(0);
+  $('dlBtn').dataset.label = `Descarrega la ruta (uns ${mb} MB)`;
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 
 /* ---------- offline download ---------- */
 async function checkOffline() {
-  const files = mediaList();
+  const files = downloadList();
   if (!('caches' in window)) { setOff(false, 'Aquest navegador no pot guardar la ruta: només es pot fer amb cobertura.'); $('dlBtn').disabled = true; return; }
   const c = await caches.open(MEDIA_CACHE);
   let have = 0; for (const f of files) if (await c.match(f)) have++;
@@ -127,13 +157,13 @@ async function checkOffline() {
   log(`Fitxers guardats: ${have}/${files.length}` + (est ? ` · espai usat ${(est.usage / 1e6).toFixed(1)} MB` : '') + ` · guardat persistent: ${persisted ? 'sí' : 'no'}`);
   $('offBar').style.width = (100 * have / files.length) + '%';
   if (have === files.length) {
-    setOff(true, 'Descarregada: la ruta, el mapa, les fotos, els àudios i els vídeos estan guardats al mòbil. Ja pots posar el mode avió.');
+    setOff(true, 'Tot guardat al mòbil: ja pots posar el mode avió.');
     $('dlBtn').textContent = 'Torna a descarregar';
   } else if (!navigator.onLine) {
-    setOff(false, `Ara no tens connexió. Pots fer la ruta igualment, però sense les fotos, els àudios i els vídeos que no tens guardats (en tens ${have} de ${files.length}).`);
+    setOff(false, `Ara no tens connexió. Pots fer la ruta igualment, però sense les fotos, els àudios, els vídeos i l'ortofoto que no tens guardats.`);
   } else {
-    setOff(false, have ? `Ja tens guardats ${have} de ${files.length} fitxers (els que has obert). Si vols anar sense cobertura, descarrega la resta.` : '');
-    $('dlBtn').textContent = 'Descarrega la ruta';
+    setOff(false, have ? `Ja tens guardada una part (${Math.round(100 * have / files.length)} %): el que has obert.` : '');
+    $('dlBtn').textContent = $('dlBtn').dataset.label || 'Descarrega la ruta';
   }
 }
 function setOff(ok, txt) {
@@ -145,45 +175,59 @@ $('dlBtn').onclick = async () => {
   const btn = $('dlBtn'); btn.disabled = true; btn.textContent = 'Descarregant…';
   try {
     if (navigator.storage && navigator.storage.persist) log('Demana guardat persistent: ' + (await navigator.storage.persist() ? 'concedit' : 'no concedit'));
-    const c = await caches.open(MEDIA_CACHE), files = mediaList();
+    const c = await caches.open(MEDIA_CACHE), files = downloadList();
     let n = 0, bytes = 0;
     for (const f of files) {
-      const res = await fetch(f, {cache: 'reload'});
-      if (!res.ok) throw new Error(f + ' → ' + res.status);
-      const blob = await res.blob(); bytes += blob.size;
-      await c.put(f, new Response(blob, {headers: {'Content-Type': res.headers.get('Content-Type') || blob.type}}));
+      if (!(await c.match(f))) {
+        const res = await fetch(f, {cache: 'reload'});
+        if (!res.ok) throw new Error(f + ' → ' + res.status);
+        const blob = await res.blob(); bytes += blob.size;
+        await c.put(f, new Response(blob, {headers: {'Content-Type': res.headers.get('Content-Type') || blob.type}}));
+      }
       n++; $('offBar').style.width = (100 * n / files.length) + '%';
     }
-    log(`Descàrrega completa: ${n} fitxers, ${(bytes / 1e6).toFixed(1)} MB`);
+    log(`Descàrrega completa: ${n} fitxers, ${(bytes / 1e6).toFixed(1)} MB nous`);
   } catch (err) { log('Error en descarregar: ' + err.message); alertMsg('No s\'ha pogut descarregar tot. Torna-ho a provar amb bona connexió.'); }
   btn.disabled = false; checkOffline();
 };
-$('resetBtn').onclick = async () => { await caches.delete(MEDIA_CACHE); log('Descàrrega esborrada'); $('offBar').style.width = '0'; checkOffline(); };
+$('resetBtn').onclick = async () => { await caches.delete(MEDIA_CACHE); tiles.clear(); log('Descàrrega esborrada'); $('offBar').style.width = '0'; checkOffline(); };
 $('copyDiag').onclick = async () => {
   const txt = logLines.join('\n');
   try { await navigator.clipboard.writeText(txt); $('copyDiag').textContent = 'Copiat ✓'; }
   catch (e) { const r = document.createRange(); r.selectNodeContents($('diagLog')); getSelection().removeAllRanges(); getSelection().addRange(r); }
 };
-function alertMsg(t) { $('offText').textContent = t; }
+function alertMsg(t) { $('offText').textContent = t; $('offText').hidden = false; }
 
 /* ---------- point sheet ---------- */
 let sheetIdx = -1;
 function openSheet(i) {
   const p = POIS[i]; sheetIdx = i;
-  $('shTitle').textContent = `${i + 1}. ${p.name}`;
+  $('shTitle').textContent = isTreasure(p) ? p.name : `${i + 1}. ${p.name}`;
   $('shTheme').textContent = p.theme || (isTreasure(p) ? 'Tresor' : '');
+  $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [p.x, p.y])) + ' de tu' : '';
   $('shGal').innerHTML = p.imgs.map(f => `<img src="media/${f}" alt="">`).join('');
+  $('shCountM').innerHTML = [[p.audio.length, '🔊 àudio'], [p.imgs.length, '🖼 ' + (p.imgs.length > 1 ? 'fotos' : 'foto')], [p.video.length, '▶ vídeo']]
+    .filter(m => m[0]).map(m => `<span>${m[1].replace(' ', ' ' + m[0] + ' ')}</span>`).join('');
+  $('shGal').scrollLeft = 0;
+  $('shCount').hidden = p.imgs.length < 2; $('shCount').textContent = `1 / ${p.imgs.length}`;
   const au = $('shAudio'), vi = $('shVideo');
-  au.hidden = !p.audio.length; au.src = p.audio.length ? 'media/' + p.audio[0] : '';
+  $('shAudioBox').hidden = !p.audio.length; au.src = p.audio.length ? 'media/' + p.audio[0] : '';
   vi.hidden = !p.video.length; vi.src = p.video.length ? 'media/' + p.video[0] : '';
   missKinds.clear(); $('shMiss').hidden = true;
   if (!navigator.onLine) checkMissing(p);
   $('shBody').innerHTML = p.html || (isTreasure(p) ? `<p>${found.has(p.id) ? 'Tresor trobat! ★' : 'Apropa\'t a aquest punt per trobar el tresor.'}</p>` : '<p class="muted">Aquest punt encara no té text.</p>');
   const text = $('shBody').innerText.trim();
-  $('shActions').innerHTML = text && 'speechSynthesis' in window ? '<button id="ttsBtn">Llegeix en veu alta</button>' : '';
+  $('shActions').innerHTML = text && 'speechSynthesis' in window ? '<button id="ttsBtn">🔊 Llegeix en veu alta</button>' : '';
   if ($('ttsBtn')) $('ttsBtn').onclick = () => speak(p.name + '. ' + text, true);
-  $('sheet').hidden = false;
+  $('shPrev').disabled = i === 0; $('shNext').disabled = i === POIS.length - 1;
+  $('sheet').hidden = false; $('sheet').querySelector('.sheet-in').scrollTop = 0;
 }
+$('shGal').addEventListener('scroll', () => {
+  const g = $('shGal'), n = g.children.length;
+  if (n > 1) $('shCount').textContent = `${Math.round(g.scrollLeft / g.clientWidth) + 1} / ${n}`;
+}, {passive: true});
+$('shPrev').onclick = () => { stopMedia(); openSheet(sheetIdx - 1); };
+$('shNext').onclick = () => { stopMedia(); openSheet(sheetIdx + 1); };
 // Offline and not saved: hide that audio/video and say what is missing.
 const missKinds = new Set();
 function noteMissing(kind) {
@@ -193,12 +237,13 @@ function noteMissing(kind) {
 }
 async function checkMissing(p) {
   const c = await caches.open(MEDIA_CACHE);
-  if (p.audio.length && !(await c.match('media/' + p.audio[0]))) { $('shAudio').hidden = true; noteMissing('àudio'); }
+  if (p.audio.length && !(await c.match('media/' + p.audio[0]))) { $('shAudioBox').hidden = true; noteMissing('àudio'); }
   if (p.video.length && !(await c.match('media/' + p.video[0]))) { $('shVideo').hidden = true; noteMissing('vídeo'); }
 }
-$('shAudio').onerror = () => { if (sheetIdx >= 0 && POIS[sheetIdx].audio.length) { $('shAudio').hidden = true; noteMissing('àudio'); } };
+$('shAudio').onerror = () => { if (sheetIdx >= 0 && POIS[sheetIdx].audio.length) { $('shAudioBox').hidden = true; noteMissing('àudio'); } };
 $('shVideo').onerror = () => { if (sheetIdx >= 0 && POIS[sheetIdx].video.length) { $('shVideo').hidden = true; noteMissing('vídeo'); } };
-function closeSheet() { $('sheet').hidden = true; $('shAudio').pause(); $('shVideo').pause(); try { speechSynthesis.cancel(); } catch (e) {} }
+function stopMedia() { $('shAudio').pause(); $('shVideo').pause(); try { speechSynthesis.cancel(); } catch (e) {} }
+function closeSheet() { $('sheet').hidden = true; stopMedia(); }
 $('shClose').onclick = closeSheet;
 $('sheet').onclick = e => { if (e.target === $('sheet')) closeSheet(); };
 
@@ -216,7 +261,7 @@ $('voiceBtn').onclick = () => { voiceOn = !voiceOn; $('voiceBtn').textContent = 
 const cv = $('map'), ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1;
 const view = {cx: 0, cy: 0, s: 1.2, rot: 0}; // s = pixels per metre
-let follow = true, headingUp = false;
+let follow = true, headingUp = false, ortho = false;
 let layers = {};
 function buildLayers() {
   const mk = (ways, close) => { const p = new Path2D(); for (const w of ways) { w.forEach(([lon, lat], i) => { const [x, y] = toXY(lat, lon); i ? p.lineTo(x, y) : p.moveTo(x, y); }); if (close) p.closePath(); } return p; };
@@ -230,13 +275,12 @@ function resize() {
   W = r.width; H = r.height; cv.width = W * DPR; cv.height = H * DPR; draw();
 }
 let dirty = false;
-function draw() { if (!dirty) { dirty = true; requestAnimationFrame(paint); } }
+function draw() { if (!dirty && W) { dirty = true; requestAnimationFrame(paint); } }
 function worldTransform() {
   const c = Math.cos(view.rot), s = Math.sin(view.rot), k = view.s * DPR;
   // screen = R(rot) * (world - centre) * scale, y flipped, centred (a little lower when following)
-  const ox = W * DPR / 2, oy = H * DPR * (follow ? 0.62 : 0.5);
+  const ox = W * DPR / 2, oy = H * DPR * (follow && me ? 0.62 : 0.5);
   const a = k * c, b = -k * s, cc = -k * s, d = -k * c; // with y flip
-  // x' = a*X + cc*Y + e ; y' = b*X + d*Y + f   (X,Y world metres)
   const e = ox - (a * view.cx + cc * view.cy), f = oy - (b * view.cx + d * view.cy);
   return [a, b, cc, d, e, f];
 }
@@ -245,41 +289,86 @@ function s2w(sx, sy) {
   const [a, b, c, d, e, f] = worldTransform(), det = a * d - b * c, X = sx * DPR - e, Y = sy * DPR - f;
   return [(d * X - c * Y) / det, (-b * X + a * Y) / det];
 }
+// Ortho tiles: loaded on demand (the service worker serves saved ones offline).
+const tiles = new Map();
+function tile(z, x, y) {
+  const url = ORTO_URL(z, x, y); let t = tiles.get(url);
+  if (!t) {
+    t = {img: new Image(), ok: false, bad: false}; t.img.crossOrigin = 'anonymous';
+    t.img.onload = () => { t.ok = true; draw(); }; t.img.onerror = () => { t.bad = true; };
+    t.img.src = url; tiles.set(url, t);
+  }
+  return t;
+}
+function paintOrtho() {
+  const mpp = 1 / (view.s * DPR), lat = LAT0 * Math.PI / 180;
+  let z = Math.round(Math.log2(156543.03 * Math.cos(lat) / mpp));
+  z = Math.max(12, Math.min(navigator.onLine ? ORTO_MAX_Z : ORTO_DL_Z[ORTO_DL_Z.length - 1], z));
+  const corners = [[0, 0], [W, 0], [0, H], [W, H]].map(([sx, sy]) => toLL(s2w(sx, sy)));
+  const xs = corners.map(c => lon2tx(c[1], z)), ys = corners.map(c => lat2ty(c[0], z));
+  const tx0 = Math.floor(Math.min(...xs)), tx1 = Math.floor(Math.max(...xs)), ty0 = Math.floor(Math.min(...ys)), ty1 = Math.floor(Math.max(...ys));
+  if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 80) return;
+  for (let x = tx0; x <= tx1; x++) for (let y = ty0; y <= ty1; y++) {
+    // not loaded yet or missing: use the closest parent tile already loaded, enlarged
+    let t = tile(z, x, y), sx = 0, sy = 0, sw = 256;
+    for (let up = 1; !t.ok && up <= 4 && z - up >= 12; up++) {
+      const f = 2 ** up, px = Math.floor(x / f), py = Math.floor(y / f), cand = tile(z - up, px, py);
+      if (cand.ok) { t = cand; sw = 256 / f; sx = (x - px * f) * sw; sy = (y - py * f) * sw; }
+    }
+    if (!t.ok) continue;
+    const [xa, ya] = toXY(ty2lat(y, z), tx2lon(x, z)), [xb, yb] = toXY(ty2lat(y + 1, z), tx2lon(x + 1, z));
+    ctx.save(); ctx.translate(xa, ya); ctx.scale((xb - xa) / 256, (yb - ya) / 256);
+    ctx.drawImage(t.img, sx, sy, sw, sw, -0.5, -0.5, 257, 257); ctx.restore();
+  }
+}
 function paint() {
   dirty = false;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#f2efe9'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = ortho ? '#4b4a3f' : '#f2efe9'; ctx.fillRect(0, 0, cv.width, cv.height);
   const T = worldTransform(); ctx.setTransform(...T);
   const lw = n => n / view.s; // n CSS px → metres
   const fill = (k, c) => { if (layers[k]) { ctx.fillStyle = c; ctx.fill(layers[k]); } };
   const line = (k, c, w, dash) => { if (!layers[k]) return; ctx.strokeStyle = c; ctx.lineWidth = lw(w); ctx.setLineDash(dash ? dash.map(lw) : []); ctx.stroke(layers[k]); };
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  fill('green', '#cdebb0'); fill('wood', '#add19e'); fill('water', '#aad3df');
-  if (layers.building && view.s > 0.5) { ctx.fillStyle = '#d9d0c9'; ctx.fill(layers.building); line('building', '#c4b6ab', 0.6); }
-  line('stream', '#aad3df', 2);
-  line('major', '#bbb', 9); line('mid', '#bbb', 7.5); line('minor', '#ccc', 6);
-  line('major', '#fcd6a4', 7); line('mid', '#f7fabf', 5.5); line('minor', '#fff', 4.5);
-  line('rail', '#888', 2, [6, 4]);
-  line('path', '#fff', 3.2); line('path', '#a0522d', 1.6, [4, 3]);
-  // route
-  line('track', '#fff', 9); line('track', '#c4541c', 5.5);
-  if (walked > 0) { // walked part in green
-    const p = new Path2D(); let started = false;
-    for (let i = 0; i < TR.length && CUM[i] <= walked; i++) { started ? p.lineTo(TR[i][0], TR[i][1]) : p.moveTo(TR[i][0], TR[i][1]); started = true; }
+  if (ortho) paintOrtho();
+  else {
+    fill('green', '#cdebb0'); fill('wood', '#add19e'); fill('water', '#aad3df');
+    if (layers.building && view.s > 0.5) { ctx.fillStyle = '#d9d0c9'; ctx.fill(layers.building); line('building', '#c4b6ab', 0.6); }
+    line('stream', '#aad3df', 2);
+    line('major', '#bbb', 9); line('mid', '#bbb', 7.5); line('minor', '#ccc', 6);
+    line('major', '#fcd6a4', 7); line('mid', '#f7fabf', 5.5); line('minor', '#fff', 4.5);
+    line('rail', '#888', 2, [6, 4]);
+    line('path', '#fff', 3.2); line('path', '#a0522d', 1.6, [4, 3]);
+  }
+  // route as in the Natura Local app: gold line with a brown edge, walked part in olive
+  line('track', '#322820', 9); line('track', '#e9bc00', 5.5);
+  if (walked > 0) {
+    const p = new Path2D(); let first = true;
+    for (let i = 0; i < TR.length && CUM[i] <= walked; i++) { first ? p.moveTo(TR[i][0], TR[i][1]) : p.lineTo(TR[i][0], TR[i][1]); first = false; }
     const q = pointAt(walked); p.lineTo(q[0], q[1]);
-    ctx.strokeStyle = '#2f7d4f'; ctx.lineWidth = lw(5.5); ctx.setLineDash([]); ctx.stroke(p);
+    ctx.strokeStyle = '#69920c'; ctx.lineWidth = lw(5.5); ctx.setLineDash([]); ctx.stroke(p);
   }
   // screen-space overlays
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.setLineDash([]);
+  paintArrows();
   const st = w2s(TR[0][0], TR[0][1]);
-  ctx.fillStyle = '#2f7d4f'; ctx.beginPath(); ctx.arc(st[0], st[1], 7, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#322820'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(st[0] - 21, st[1] - 10, 42, 20, 10) : ctx.rect(st[0] - 21, st[1] - 10, 42, 20); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.fillStyle = '#e9bc00'; ctx.font = '800 10px Raleway,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('INICI', st[0], st[1] + 0.5);
+  // points: pins (gold; treasures brown with a star; done in olive), selected one bigger
   POIS.forEach((p, i) => {
-    const [x, y] = w2s(p.x, p.y), tre = isTreasure(p), done = found.has(p.id) || visited.has(p.id);
-    ctx.fillStyle = tre ? (found.has(p.id) ? '#2f7d4f' : '#d4a017') : (done ? '#2f7d4f' : '#1f2420');
-    ctx.beginPath(); ctx.arc(x, y, 13, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.font = '700 12px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(tre ? '★' : String(i + 1), x, y + 0.5);
+    const [x, y] = w2s(p.x, p.y), tre = isTreasure(p), done = found.has(p.id) || visited.has(p.id), k = i === popIdx ? 1.25 : 1;
+    const col = done ? '#69920c' : tre ? '#322820' : '#e9bc00';
+    ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(-5, -9, -14, -14, -14, -24); ctx.arc(0, -24, 14, Math.PI, 0); ctx.bezierCurveTo(14, -14, 5, -9, 0, 0); ctx.closePath();
+    ctx.shadowColor = '#0005'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1; ctx.fillStyle = col; ctx.fill(); ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = tre && !done ? '#e9bc00' : done ? '#fff' : '#322820'; ctx.font = '800 13px Raleway,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(tre ? '★' : String(i + 1), 0, -23.5); ctx.restore();
   });
+  if (profMark != null) { // point touched on the elevation profile
+    const [x, y] = w2s(...pointAt(profMark));
+    ctx.fillStyle = '#322820'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
+  }
   if (me) {
     const [x, y] = w2s(me.x, me.y), acc = Math.min(me.acc * view.s, 200);
     ctx.fillStyle = 'rgba(26,115,232,.15)'; ctx.beginPath(); ctx.arc(x, y, Math.max(acc, 10), 0, 7); ctx.fill();
@@ -290,15 +379,26 @@ function paint() {
     }
     ctx.fillStyle = '#1a73e8'; ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
   }
-  // north arrow on the rotate button
   $('rotBtn').style.transform = `rotate(${-view.rot}rad)`;
+}
+// Direction of travel: white chevrons on the line, every ~55 px whatever the zoom.
+function paintArrows() {
+  const step = 55 / view.s;
+  ctx.strokeStyle = '#322820'; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let d = step / 2; d < TOTAL; d += step) {
+    const a = w2s(...pointAt(d)), b = w2s(...pointAt(Math.min(TOTAL, d + 1)));
+    if (a[0] < -20 || a[1] < -20 || a[0] > W + 20 || a[1] > H + 20) continue;
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    ctx.save(); ctx.translate(a[0], a[1]); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(-3.5, -4.6); ctx.lineTo(2.5, 0); ctx.lineTo(-3.5, 4.6); ctx.stroke(); ctx.restore();
+  }
 }
 function centreOn(x, y) { view.cx = x; view.cy = y; draw(); }
 function fitRoute() {
   let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
   for (const p of [...TR, ...POIS.map(p => [p.x, p.y])]) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
   view.cx = (x0 + x1) / 2; view.cy = (y0 + y1) / 2; view.rot = 0;
-  view.s = Math.min((W - 60) / (x1 - x0 || 1), (H - 60) / (y1 - y0 || 1)); draw();
+  view.s = Math.min((W - 70) / (x1 - x0 || 1), (H - 90) / (y1 - y0 || 1)); draw();
 }
 function zoom(f, sx, sy) {
   const before = sx != null ? s2w(sx, sy) : null;
@@ -312,6 +412,11 @@ $('meBtn').onclick = () => { if (!me) { fitRoute(); return; } setFollow(!follow)
 $('rotBtn').onclick = async () => {
   headingUp = !headingUp; $('rotBtn').setAttribute('aria-pressed', headingUp);
   if (headingUp) await startCompass(); else { view.rot = 0; draw(); }
+};
+$('layerBtn').onclick = () => {
+  ortho = !ortho; $('layerBtn').setAttribute('aria-pressed', ortho); $('layerBtn').textContent = ortho ? 'Mapa' : 'Orto';
+  $('attr').textContent = ortho ? '© ICGC · © OpenStreetMap' : '© OpenStreetMap';
+  log('Capa: ' + (ortho ? 'ortofoto' : 'mapa')); draw();
 };
 // gestures: drag to pan, pinch to zoom, wheel on desktop
 const ptrs = new Map(); let pinch0 = null;
@@ -332,11 +437,91 @@ function pinchDist() { const [a, b] = [...ptrs.values()]; return Math.hypot(a[0]
 let downAt = 0, downXY = [0, 0]; cv.addEventListener('pointerdown', e => { downAt = Date.now(); downXY = [e.offsetX, e.offsetY]; });
 function tapAt(x, y) {
   if (Date.now() - downAt > 300) return;
-  let best = -1, bd = 24;
-  POIS.forEach((p, i) => { const [sx, sy] = w2s(p.x, p.y), d = Math.hypot(sx - x, sy - y); if (d < bd) { bd = d; best = i; } });
-  if (best >= 0) openSheet(best);
+  let best = -1, bd = 26;
+  POIS.forEach((p, i) => { const [sx, sy] = w2s(p.x, p.y), d = Math.hypot(sx - x, sy - y + 24); if (d < bd) { bd = d; best = i; } });
+  if (best >= 0) showPop(best); else hidePop();
 }
-addEventListener('resize', () => { if (!$('nav').hidden) resize(); });
+// Small card for a point tapped on the map (as in the app): name, start of the text, «Més informació».
+let popIdx = -1;
+function showPop(i) {
+  const p = POIS[i], t = $('toast'); popIdx = i;
+  const tmp = document.createElement('div'); tmp.innerHTML = p.html || '';
+  const txt = tmp.textContent.trim().slice(0, 160);
+  const d = me ? ' · a ' + fmtM(dist([me.x, me.y], [p.x, p.y])) : '';
+  t.className = 'toast info';
+  t.innerHTML = `<span class="t">${esc(p.theme || (isTreasure(p) ? 'Tresor' : 'Punt'))}${d}</span><h3>${isTreasure(p) ? '★ ' : (i + 1) + '. '}${esc(p.name)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}<div class="row"><button class="primary grow" id="tOpen">Més informació ›</button><button id="tClose">Tanca</button></div>`;
+  t.hidden = false;
+  $('tOpen').onclick = () => { hidePop(); openSheet(i); };
+  $('tClose').onclick = hidePop;
+  draw();
+}
+function hidePop() { if ($('toast').classList.contains('info')) $('toast').hidden = true; popIdx = -1; draw(); }
+addEventListener('resize', () => { if (!$('nav').hidden) { resize(); drawProfile(); } });
+
+/* ---------- full screen: map only, with a small bar for the next point ---------- */
+function setFull(on) {
+  $('nav').classList.toggle('full', on); $('miniBar').hidden = !on;
+  $('fullBtn').setAttribute('aria-pressed', on); $('fullBtn').textContent = on ? '⤡' : '⤢';
+  const de = document.documentElement;
+  try {
+    if (on && de.requestFullscreen && !document.fullscreenElement) de.requestFullscreen({navigationUI: 'hide'}).catch(() => {});
+    if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  } catch (e) {}
+  requestAnimationFrame(resize);
+}
+$('fullBtn').onclick = () => setFull(!$('nav').classList.contains('full'));
+$('miniBar').onclick = () => setFull(false);
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && $('nav').classList.contains('full')) setFull(false); });
+
+/* ---------- elevation profile ---------- */
+let profMark = null;
+const pc = $('prof');
+function drawProfile() {
+  if (!ELE.length || $('profBox').hidden || !$('profBox').open) return;
+  const r = pc.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+  if (!r.width) return;
+  pc.width = r.width * dpr; pc.height = r.height * dpr;
+  const g = pc.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = r.width, h = r.height, L = 30, B = 16, T = 8;
+  const lo = Math.floor(Math.min(...ELE) / 5) * 5, hi = Math.ceil(Math.max(...ELE) / 5) * 5 || lo + 5;
+  const X = d => L + (w - L - 6) * d / TOTAL, Y = e => T + (h - T - B) * (1 - (e - lo) / (hi - lo || 1));
+  const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--muted').trim(), olive = css.getPropertyValue('--olive').trim();
+  g.clearRect(0, 0, w, h);
+  g.font = '600 10px Raleway,system-ui,sans-serif'; g.fillStyle = ink; g.textAlign = 'right'; g.textBaseline = 'middle';
+  g.fillText(hi + ' m', L - 4, Y(hi)); g.fillText(lo + ' m', L - 4, Y(lo));
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText('0', X(0), h - 3); g.fillText(fmtM(TOTAL), X(TOTAL) - 14, h - 3);
+  const path = () => { g.beginPath(); g.moveTo(X(0), Y(ELE[0])); CUM.forEach((d, i) => g.lineTo(X(d), Y(ELE[i]))); };
+  path(); g.lineTo(X(TOTAL), Y(lo)); g.lineTo(X(0), Y(lo)); g.closePath(); g.fillStyle = 'rgba(233,188,0,.25)'; g.fill();
+  path(); g.strokeStyle = '#c99f00'; g.lineWidth = 2; g.stroke();
+  if (walked > 0) { // walked part
+    g.save(); g.beginPath(); g.rect(0, 0, X(walked), h); g.clip();
+    path(); g.lineTo(X(TOTAL), Y(lo)); g.lineTo(X(0), Y(lo)); g.closePath(); g.fillStyle = 'rgba(105,146,12,.28)'; g.fill();
+    path(); g.strokeStyle = olive; g.stroke(); g.restore();
+  }
+  for (const p of POIS) { // points as small ticks
+    g.fillStyle = isTreasure(p) ? '#e9bc00' : '#322820'; g.beginPath(); g.arc(X(p.along), Y(at(p.along).ele), 3, 0, 7); g.fill();
+  }
+  const mark = (d, col) => { const e = at(d).ele; g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(d), T); g.lineTo(X(d), h - B); g.stroke();
+    g.fillStyle = col; g.beginPath(); g.arc(X(d), Y(e), 5.5, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); };
+  if (started) mark(walked, '#1a73e8');
+  if (profMark != null) mark(profMark, '#322820');
+}
+$('profBox').addEventListener('toggle', () => { drawProfile(); log('Perfil de desnivell: ' + ($('profBox').open ? 'obert' : 'tancat')); });
+// touching the profile shows that point on the map
+function profAt(e) { const r = pc.getBoundingClientRect(); return Math.max(0, Math.min(TOTAL, (e.clientX - r.left - 30) / (r.width - 36) * TOTAL)); }
+pc.addEventListener('pointerdown', e => { pc.setPointerCapture(e.pointerId); profMark = profAt(e); showProfMark(); });
+pc.addEventListener('pointermove', e => { if (profMark != null) { profMark = profAt(e); showProfMark(); } });
+const endProf = () => { if (profMark == null) return; profMark = null; drawProfile(); $('profSum').textContent = profSummary(); draw(); };
+pc.addEventListener('pointerup', endProf); pc.addEventListener('pointercancel', endProf);
+function showProfMark() {
+  const a = at(profMark); drawProfile(); draw();
+  $('profSum').textContent = `· km ${(profMark / 1000).toFixed(2).replace('.', ',')} · ${Math.round(a.ele)} m`;
+}
+function profSummary() {
+  if (!ELE.length) return '';
+  let up = 0, down = 0; for (let i = 1; i < ELE.length; i++) { const d = ELE[i] - ELE[i - 1]; d > 0 ? up += d : down -= d; }
+  return `· +${Math.round(up)} m / −${Math.round(down)} m`;
+}
 
 /* ---------- position: GPS or simulation ---------- */
 let started = false, me = null, heading = null, walked = 0, gpsWatch = null, simTimer = null, maxAlong = 0;
@@ -356,6 +541,7 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
   walked = maxAlong;
   $('progBar').style.width = (100 * walked / TOTAL) + '%';
   $('sDone').textContent = fmtM(walked); $('sLeft').textContent = fmtM(Math.max(0, TOTAL - walked));
+  const e = at(s.along).ele; if (e != null) $('sEle').textContent = Math.round(e) + ' m';
   // proximity to points
   let nextI = -1, nd = Infinity;
   POIS.forEach((p, i) => {
@@ -364,23 +550,25 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
     else if (!isTreasure(p) && d <= NEAR_M && !notified.has(p.id)) { notified.add(p.id); visited.add(p.id); arrive(i, false); }
     if (!visited.has(p.id) && !found.has(p.id) && d < nd) { nd = d; nextI = i; }
   });
-  updateNext(nextI, nd); updateTreasures();
+  updateNext(nextI, nd); updateTreasures(); drawProfile();
   if (follow) centreOn(x, y); else draw();
   if (src === 'gps') $('gpsNote').textContent = `GPS: precisió ±${Math.round(acc)} m · a ${Math.round(s.off)} m del track`;
 }
 function updateNext(i, d) {
-  if (i < 0) { $('nBadge').textContent = '✓'; $('nName').textContent = 'Has vist tots els punts'; $('nDist').textContent = 'Ruta completada'; return; }
-  const p = POIS[i];
-  $('nBadge').textContent = isTreasure(p) ? '★' : i + 1; $('nName').textContent = p.name;
-  $('nDist').textContent = 'Punt més proper · ' + fmtM(d); $('nextBtn').dataset.i = i;
+  let badge, name, txt;
+  if (i < 0) { badge = '✓'; name = 'Has vist tots els punts'; txt = 'Ruta completada'; }
+  else { const p = POIS[i]; badge = isTreasure(p) ? '★' : i + 1; name = p.name; txt = isNaN(d) ? 'Primer punt' : 'Punt més proper · ' + fmtM(d); $('nextBtn').dataset.i = i; }
+  $('nBadge').textContent = $('mBadge').textContent = badge;
+  $('nName').textContent = $('mName').textContent = name;
+  $('nDist').textContent = $('mDist').textContent = txt;
 }
 $('nextBtn').onclick = () => { const i = $('nextBtn').dataset.i; if (i != null) openSheet(+i); };
 function updateTreasures() { const n = POIS.filter(isTreasure).length; $('sTre').textContent = `${found.size}/${n}`; }
 function arrive(i, treasure) {
   const p = POIS[i];
   if (navigator.vibrate) navigator.vibrate(treasure ? [200, 100, 200, 100, 400] : [250, 120, 250]);
-  const t = $('toast');
-  t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : 'Has arribat'}</span><h3>${treasure ? '★ ' : (i + 1) + '. '}${esc(p.name)}</h3><div class="row"><button class="primary" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
+  const t = $('toast'); popIdx = -1; t.className = 'toast';
+  t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : 'Has arribat'}</span><h3>${treasure ? '★ ' : (i + 1) + '. '}${esc(p.name)}</h3><div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
   t.hidden = false;
   $('tOpen').onclick = () => { t.hidden = true; openSheet(i); };
   $('tClose').onclick = () => { t.hidden = true; };
@@ -406,15 +594,14 @@ $('simBtn').onclick = () => {
   if (simTimer) { stopSim(); return; }
   if (gpsWatch != null) $('gpsBtn').click();
   speak('', true);
-  let along = Math.max(0, walked), last = null; started = true;
-  const toLL = ([x, y]) => [y / KY + LAT0, x / KX + LON0];
+  let along = Math.max(0, walked); started = true;
   simTimer = setInterval(() => {
     along += 1.4 * 4 * 0.5; // walking speed ×4, every 0.5 s
     if (along >= TOTAL) { along = TOTAL; stopSim(); }
-    const p = pointAt(along), [lat, lon] = toLL(p);
-    onPosition(lat, lon, 5, null, 'sim'); last = p;
+    const [lat, lon] = toLL(pointAt(along));
+    onPosition(lat, lon, 5, null, 'sim');
   }, 500);
-  $('simBtn').textContent = 'Atura la simulació'; setFollow(true); keepAwake();
+  $('simBtn').textContent = 'Atura'; setFollow(true); keepAwake();
   $('gpsNote').textContent = 'Simulació: camina sola pel track (4 vegades més ràpid).';
 };
 // compass (heading-up map)
@@ -438,7 +625,7 @@ async function startCompass() {
 /* ---------- screens ---------- */
 function show(nav) {
   $('home').hidden = nav; $('nav').hidden = !nav;
-  if (nav) { resize(); if (!me) fitRoute(); } else checkOffline();
+  if (nav) { resize(); if (!me) fitRoute(); drawProfile(); } else { if ($('nav').classList.contains('full')) setFull(false); checkOffline(); }
 }
 $('startBtn').onclick = () => { show(true); history.pushState({nav: 1}, ''); };
 $('backBtn').onclick = () => history.back();
@@ -449,14 +636,15 @@ addEventListener('popstate', () => { closeSheet(); show(false); });
   updateNet();
   try {
     [D, BASE] = await Promise.all([fetch('data.json').then(r => r.json()), fetch('basemap.json').then(r => r.json())]);
-  } catch (e) { log('No s\'han pogut carregar les dades: ' + e.message); $('offText').textContent = 'No s\'han pogut carregar les dades. Obre l\'app amb connexió la primera vegada.'; return; }
+  } catch (e) { log('No s\'han pogut carregar les dades: ' + e.message); alertMsg('No s\'han pogut carregar les dades. Obre l\'app amb connexió la primera vegada.'); return; }
   LAT0 = D.route.track[0][0]; LON0 = D.route.track[0][1]; KX = 111320 * Math.cos(LAT0 * Math.PI / 180);
   prepTrack();
   POIS = D.pois.map(p => { const [x, y] = toXY(p.lat, p.lon); return {...p, x, y, along: 0}; });
   POIS.forEach(p => p.along = snap([p.x, p.y]).along);
   POIS.sort((a, b) => a.along - b.along);
   buildLayers(); renderHome(); updateTreasures(); updateNext(0, NaN);
-  $('nDist').textContent = 'Primer punt';
-  log(`Ruta: ${fmtM(TOTAL)}, ${POIS.length} punts`);
+  $('profBox').hidden = !ELE.length; $('profSum').textContent = profSummary();
+  if (ELE.length) $('sEle').textContent = Math.round(ELE[0]) + ' m';
+  log(`Ruta: ${fmtM(TOTAL)}, ${POIS.length} punts, ${orthoList().length} tessel·les d'ortofoto per descarregar`);
   checkOffline();
 })();
