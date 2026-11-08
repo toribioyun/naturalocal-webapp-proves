@@ -55,7 +55,7 @@ addEventListener('offline', updateNet);
 document.addEventListener('error', e => { if (e.target.tagName === 'IMG') e.target.classList.add('broken'); }, true);
 if ('serviceWorker' in navigator) {
   // A new version installs in the background: show it straight away (not at the next opening), unless navigating or reading a sheet.
-  const hadWorker = !!navigator.serviceWorker.controller;
+  const c0 = navigator.serviceWorker.controller, hadWorker = !!c0 && c0.scriptURL === new URL('sw.js', location.href).href; // a parent app's worker does not count
   let reloading = false, swReg = null;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadWorker || reloading || nav || !$('sheet').hidden) return;

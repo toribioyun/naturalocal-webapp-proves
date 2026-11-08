@@ -55,10 +55,10 @@ log('Mode app instal·lada: ' + (standalone ? 'sí' : 'no'));
 
 if ('serviceWorker' in navigator) {
   // A new version installs in the background: show it straight away (not at the next opening), unless the walker is busy.
-  const hadWorker = !!navigator.serviceWorker.controller;
+  const c0 = navigator.serviceWorker.controller, hadWorker = !!c0 && c0.scriptURL === new URL('sw.js', location.href).href; // a parent app's worker does not count
   let reloading = false, swReg = null;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!hadWorker || reloading || !$('nav').hidden || !$('sheet').hidden || $('offState').textContent.includes('%')) return;
+    if (!hadWorker || reloading || !$('nav').hidden || !$('sheet').hidden || $('dlBtn').disabled) return;
     reloading = true; location.reload();
   });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && swReg) swReg.update().catch(() => {}); });
