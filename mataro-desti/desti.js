@@ -158,7 +158,7 @@ function openSheet(i) {
   else if (it.g === 'ruta') acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
   if (it.tel) acts.push(`<a class="btn" href="tel:${esc(it.tel)}">📞 Truca</a>`);
   acts.push(`<button id="aMap">Veure al mapa</button>`);
-  if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Fitxa a la web ↗</a>`);
+  if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Veure la fitxa a Natura Local ↗</a>`);
   $('shActions').innerHTML = acts.join('');
   if ($('aNav')) $('aNav').onclick = () => { closeSheet(); startNav(it); };
   $('aMap').onclick = () => { closeSheet(); showOnMap(it); };

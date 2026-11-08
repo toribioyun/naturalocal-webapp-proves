@@ -3,8 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Natura Local · Parc Mataró</title>
-<meta name="description" content="Prototip de web app de Natura Local que funciona sense cobertura.">
+<title>Natura Local · Ruta Ermites de Mata</title>
+<meta name="description" content="L’Ajuntament ens proposa aquesta variada ruta que recorre les grans &lt;strong&gt;platges de Mataró&lt;/strong&gt;, l’interessant espai agrari de &lt;strong&gt;les Cinc Sénies&lt;/strong&gt;, les ermites de &lt;strong&gt;Sant Miqu">
+<meta name="robots" content="noindex">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Ruta Ermites de Mata">
+<meta property="og:description" content="L’Ajuntament ens proposa aquesta variada ruta que recorre les grans &lt;strong&gt;platges de Mataró&lt;/strong&gt;, l’interessant espai agrari de &lt;strong&gt;les Cinc Sénies&lt;/strong&gt;, les ermites de &lt;strong&gt;Sant Miqu">
+<meta property="og:image" content="https://toribioyun.github.io/naturalocal-webapp-proves/mataro-desti/rutes/39239/media/n39239_1.jpg">
 <meta name="theme-color" content="#322820">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,14 +30,15 @@
     <span id="net" class="net" aria-live="polite"></span>
   </header>
   <div class="hero">
-    <img id="heroImg" alt="">
+    <img id="heroImg" alt="" src="media/n39239_1.jpg">
     <div class="hero-txt">
       <span class="kind"><img src="fulla.svg" alt=""> Ruta</span>
-      <h1 id="rTitle"></h1>
+      <h1 id="rTitle">Ruta Ermites de Mata</h1>
     </div>
   </div>
   <section class="pad">
-    <dl class="facts" id="rStats"></dl>
+    <dl class="facts" id="rStats"><div><dt>Distància</dt><dd>14,50 km</dd></div><div><dt>Durada</dt><dd>5 hores 15 minuts</dd></div><div><dt>Desnivell</dt><dd>370 m</dd></div><div><dt>Dificultat</dt><dd>Mitjana</dd></div><div><dt>Tipologia</dt><dd>Circular antihorari</dd></div><div><dt>Tema</dt><dd>Flora i fauna, Paisatgístic, Platges i cales</dd></div></dl>
+    <a id="fitxaLink" class="fitxa-link" target="_blank" rel="noopener" href="https://naturalocal.net/ca/rutes-senderisme-catalunya/rutes-senderisme/rutes-senderisme-mataro/ruta-ermites-de-mata">Veure la fitxa a Natura Local ↗</a>
 
     <button id="startBtn" class="big primary">Comença la ruta</button>
     <button id="demoBtn" class="big demo">▶ Prova-la des de casa</button>
@@ -132,6 +138,7 @@
       <video id="shVideo" controls playsinline preload="none" hidden></video>
       <div class="row" id="shActions"></div>
       <div id="shBody" class="body"></div>
+      <a id="shFitxa" class="fitxa-link" target="_blank" rel="noopener" hidden>Veure la fitxa a Natura Local ↗</a>
     </div>
     <div class="sh-nav">
       <button id="shPrev">‹ Anterior</button>

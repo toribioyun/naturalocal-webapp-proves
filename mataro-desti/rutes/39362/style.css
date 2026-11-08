@@ -49,6 +49,7 @@ h2.sec{color:var(--olive);text-transform:uppercase;letter-spacing:.04em;font-siz
 .big{width:100%;padding:15px;font-size:1.08rem}
 .demo{margin-top:10px;background:var(--brown);border-color:var(--brown);color:var(--gold)}
 .cta-note{font-size:.84rem;color:var(--muted);margin:8px 4px 0}
+.fitxa-link{display:block;margin:12px 4px;font-weight:700;color:#4f6f09;text-decoration:underline;text-underline-offset:3px}
 .box{margin:22px 0 0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:10px}
 .box-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .box p{margin:0;font-size:.88rem}

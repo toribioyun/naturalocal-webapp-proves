@@ -97,7 +97,11 @@ const pointAt = along => at(along).pt;
 
 /* ---------- points ---------- */
 let POIS = [];
+const SIGNPOST = new Path2D('M-6-7.5H3.5L7-5 3.5-2.5H-6ZM6 .5H-3.5L-7 3-3.5 5.5H6Z'); // two direction boards, drawn in a 24 px circle
 const isTreasure = p => /^tresor/i.test(p.name);
+// Information points (directions, warnings): on the map and as a notice, but not in the list of points of interest.
+const isInfo = p => p.kind === 'info';
+const hasContent = p => p.imgs.length || p.audio.length || p.video.length || /\S/.test((p.html || '').replace(/<[^>]*>|&nbsp;/g, ''));
 function mediaList() {
   const s = new Set();
   D.route.imgs.forEach(f => s.add('media/' + f));
@@ -135,14 +139,16 @@ function renderHome() {
     ['Tipologia', r.tipus], ['Tema', r.tema]].filter(f => f[1]);
   $('rStats').innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   $('poiList').innerHTML = POIS.map((p, i) => {
+    if (isInfo(p)) return '';
     const th = p.imgs[0] ? `<img src="media/${p.imgs[0]}" alt="" loading="lazy">` : `<span class="ph">${isTreasure(p) ? '★' : '•'}</span>`;
     const extra = [p.theme || (isTreasure(p) ? 'Tresor' : ''), p.audio.length ? 'àudio' : '', p.video.length ? 'vídeo' : ''].filter(Boolean).join(' · ');
-    return `<li><button data-i="${i}"><span class="th">${th}<span class="num">${isTreasure(p) ? '★' : i + 1}</span></span><span><small>${esc(extra)}</small><b>${esc(p.name)}</b></span><span class="chev">›</span></button></li>`;
+    return `<li><button data-i="${i}"><span class="th">${th}<span class="num">${isTreasure(p) ? '★' : p.num}</span></span><span><small>${esc(extra)}</small><b>${esc(p.name)}</b></span><span class="chev">›</span></button></li>`;
   }).join('');
   $('poiList').onclick = e => { const b = e.target.closest('button'); if (b) openSheet(+b.dataset.i); };
   const mediaMB = r.mediaMB || 8;
   document.querySelectorAll('.mbOnline').forEach(e => e.textContent = `uns ${Math.round(mediaMB)} MB`);
   document.title = 'Natura Local · ' + r.name;
+  if (r.url) { $('fitxaLink').href = r.url; $('fitxaLink').hidden = false; }
   if (r.back) { $('backLink').href = r.back; $('backLink').textContent = '‹ ' + r.backName; $('backLink').hidden = false; $('protoTag').hidden = true; }
   const mb = (mediaMB + orthoList().length * ORTO_KB / 1000).toFixed(0);
   $('dlBtn').dataset.label = `Descarrega la ruta (uns ${mb} MB)`;
@@ -205,8 +211,8 @@ function alertMsg(t) { $('offText').textContent = t; $('offText').hidden = false
 let sheetIdx = -1;
 function openSheet(i) {
   const p = POIS[i]; sheetIdx = i;
-  $('shTitle').textContent = isTreasure(p) ? p.name : `${i + 1}. ${p.name}`;
-  $('shTheme').textContent = p.theme || (isTreasure(p) ? 'Tresor' : '');
+  $('shTitle').textContent = isTreasure(p) || isInfo(p) ? p.name : `${p.num}. ${p.name}`;
+  $('shTheme').textContent = p.theme || (isTreasure(p) ? 'Tresor' : isInfo(p) ? 'Indicació' : '');
   $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [p.x, p.y])) + ' de tu' : '';
   $('shGal').innerHTML = p.imgs.map(f => `<img src="media/${f}" alt="">`).join('');
   $('shCountM').innerHTML = [[p.audio.length, '🔊 àudio'], [p.imgs.length, '🖼 ' + (p.imgs.length > 1 ? 'fotos' : 'foto')], [p.video.length, '▶ vídeo']]
@@ -222,15 +228,18 @@ function openSheet(i) {
   const text = $('shBody').innerText.trim();
   $('shActions').innerHTML = text && 'speechSynthesis' in window ? '<button id="ttsBtn">🔊 Llegeix en veu alta</button>' : '';
   if ($('ttsBtn')) $('ttsBtn').onclick = () => speak(p.name + '. ' + text, true);
-  $('shPrev').disabled = i === 0; $('shNext').disabled = i === POIS.length - 1;
+  $('shPrev').disabled = isInfo(p) || stepIdx(i, -1) < 0; $('shNext').disabled = isInfo(p) || stepIdx(i, 1) < 0;
+  $('shFitxa').hidden = !p.url || isInfo(p); if (p.url) $('shFitxa').href = p.url; // information points have no page of their own to show
   $('sheet').hidden = false; $('sheet').querySelector('.sheet-in').scrollTop = 0;
 }
 $('shGal').addEventListener('scroll', () => {
   const g = $('shGal'), n = g.children.length;
   if (n > 1) $('shCount').textContent = `${Math.round(g.scrollLeft / g.clientWidth) + 1} / ${n}`;
 }, {passive: true});
-$('shPrev').onclick = () => { stopMedia(); openSheet(sheetIdx - 1); };
-$('shNext').onclick = () => { stopMedia(); openSheet(sheetIdx + 1); };
+// Previous / next skip the information points.
+function stepIdx(i, dir) { for (let j = i + dir; j >= 0 && j < POIS.length; j += dir) if (!isInfo(POIS[j])) return j; return -1; }
+$('shPrev').onclick = () => { stopMedia(); openSheet(stepIdx(sheetIdx, -1)); };
+$('shNext').onclick = () => { stopMedia(); openSheet(stepIdx(sheetIdx, 1)); };
 // Offline and not saved: hide that audio/video and say what is missing.
 const missKinds = new Set();
 function noteMissing(kind) {
@@ -357,8 +366,18 @@ function paint() {
   const st = w2s(TR[0][0], TR[0][1]);
   ctx.fillStyle = '#322820'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(st[0] - 21, st[1] - 10, 42, 20, 10) : ctx.rect(st[0] - 21, st[1] - 10, 42, 20); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
   ctx.fillStyle = '#e9bc00'; ctx.font = '800 10px Raleway,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('INICI', st[0], st[1] + 0.5);
+  // information points: a round signpost sitting on the track, below the pins; faded once passed
+  POIS.forEach((p, i) => {
+    if (!isInfo(p)) return;
+    const [x, y] = w2s(p.x, p.y), k = i === popIdx ? 1.3 : 1;
+    ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.globalAlpha = notified.has(p.id) ? 0.55 : 1;
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.shadowColor = '#0005'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1; ctx.fillStyle = '#fff'; ctx.fill(); ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = '#322820'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#322820'; ctx.fillRect(-1, -8, 2, 16); ctx.fill(SIGNPOST); ctx.restore();
+  });
   // points: pins (gold; treasures brown with a star; done in olive), selected one bigger
   POIS.forEach((p, i) => {
+    if (isInfo(p)) return;
     const [x, y] = w2s(p.x, p.y), tre = isTreasure(p), done = found.has(p.id) || visited.has(p.id), k = i === popIdx ? 1.25 : 1;
     const col = done ? '#69920c' : tre ? '#322820' : '#e9bc00';
     ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
@@ -366,7 +385,7 @@ function paint() {
     ctx.shadowColor = '#0005'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1; ctx.fillStyle = col; ctx.fill(); ctx.shadowColor = 'transparent';
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
     ctx.fillStyle = tre && !done ? '#e9bc00' : done ? '#fff' : '#322820'; ctx.font = '800 13px Raleway,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(tre ? '★' : String(i + 1), 0, -23.5); ctx.restore();
+    ctx.fillText(tre ? '★' : String(p.num), 0, -23.5); ctx.restore();
   });
   if (profMark != null) { // point touched on the elevation profile
     const [x, y] = w2s(...pointAt(profMark));
@@ -444,7 +463,7 @@ let downAt = 0, downXY = [0, 0]; cv.addEventListener('pointerdown', e => { downA
 function tapAt(x, y) {
   if (Date.now() - downAt > 300) return;
   let best = -1, bd = 26;
-  POIS.forEach((p, i) => { const [sx, sy] = w2s(p.x, p.y), d = Math.hypot(sx - x, sy - y + 24); if (d < bd) { bd = d; best = i; } });
+  POIS.forEach((p, i) => { const [sx, sy] = w2s(p.x, p.y), d = Math.hypot(sx - x, sy - (isInfo(p) ? 0 : 24) - y); if (d < bd) { bd = d; best = i; } });
   if (best >= 0) showPop(best); else hidePop();
 }
 // Small card for a point tapped on the map (as in the app): name, start of the text, «Més informació».
@@ -455,9 +474,10 @@ function showPop(i) {
   const txt = tmp.textContent.trim().slice(0, 160);
   const d = me ? ' · a ' + fmtM(dist([me.x, me.y], [p.x, p.y])) : '';
   t.className = 'toast info';
-  t.innerHTML = `<span class="t">${esc(p.theme || (isTreasure(p) ? 'Tresor' : 'Punt'))}${d}</span><h3>${isTreasure(p) ? '★ ' : (i + 1) + '. '}${esc(p.name)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}<div class="row"><button class="primary grow" id="tOpen">Més informació ›</button><button id="tClose">Tanca</button></div>`;
+  const info = isInfo(p), more = !info || hasContent(p);
+  t.innerHTML = `<span class="t">${esc(p.theme || (isTreasure(p) ? 'Tresor' : info ? 'Indicació' : 'Punt'))}${d}</span><h3>${isTreasure(p) ? '★ ' : info ? '' : p.num + '. '}${esc(p.name)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}<div class="row">${more ? '<button class="primary grow" id="tOpen">Més informació ›</button>' : ''}<button id="tClose"${more ? '' : ' class="grow"'}>${more ? 'Tanca' : 'D\'acord'}</button></div>`;
   t.hidden = false;
-  $('tOpen').onclick = () => { hidePop(); openSheet(i); };
+  if (more) $('tOpen').onclick = () => { hidePop(); openSheet(i); };
   $('tClose').onclick = hidePop;
   draw();
 }
@@ -504,7 +524,8 @@ function drawProfile() {
     path(); g.lineTo(X(TOTAL), Y(lo)); g.lineTo(X(0), Y(lo)); g.closePath(); g.fillStyle = 'rgba(105,146,12,.28)'; g.fill();
     path(); g.strokeStyle = olive; g.stroke(); g.restore();
   }
-  for (const p of POIS) { // points as small ticks
+  for (const p of POIS) { // points of interest as small ticks
+    if (isInfo(p)) continue;
     g.fillStyle = isTreasure(p) ? '#e9bc00' : '#322820'; g.beginPath(); g.arc(X(p.along), Y(at(p.along).ele), 3, 0, 7); g.fill();
   }
   const mark = (d, col) => { const e = at(d).ele; g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(d), T); g.lineTo(X(d), h - B); g.stroke();
@@ -554,6 +575,7 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
   let nextI = -1, nd = Infinity;
   POIS.forEach((p, i) => {
     const d = dist([x, y], [p.x, p.y]);
+    if (isInfo(p)) { if (d <= NEAR_M && !notified.has(p.id)) { notified.add(p.id); arriveInfo(i); } return; }
     if (isTreasure(p) && d <= TREASURE_M && !found.has(p.id)) { found.add(p.id); arrive(i, true); }
     else if (!isTreasure(p) && d <= NEAR_M && !notified.has(p.id)) { notified.add(p.id); visited.add(p.id); arrive(i, false); }
     if (!visited.has(p.id) && !found.has(p.id) && d < nd) { nd = d; nextI = i; }
@@ -565,7 +587,7 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
 function updateNext(i, d) {
   let badge, name, txt;
   if (i < 0) { badge = '✓'; name = 'Has vist tots els punts'; txt = 'Ruta completada'; }
-  else { const p = POIS[i]; badge = isTreasure(p) ? '★' : i + 1; name = p.name; txt = isNaN(d) ? 'Primer punt' : 'Punt més proper · ' + fmtM(d); $('nextBtn').dataset.i = i; }
+  else { const p = POIS[i]; badge = isTreasure(p) ? '★' : p.num; name = p.name; txt = isNaN(d) ? 'Primer punt' : 'Punt més proper · ' + fmtM(d); $('nextBtn').dataset.i = i; }
   $('nBadge').textContent = $('mBadge').textContent = badge;
   $('nName').textContent = $('mName').textContent = name;
   $('nDist').textContent = $('mDist').textContent = txt;
@@ -576,12 +598,20 @@ function arrive(i, treasure) {
   const p = POIS[i];
   if (navigator.vibrate) navigator.vibrate(treasure ? [200, 100, 200, 100, 400] : [250, 120, 250]);
   const t = $('toast'); popIdx = -1; t.className = 'toast';
-  t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : 'Has arribat'}</span><h3>${treasure ? '★ ' : (i + 1) + '. '}${esc(p.name)}</h3><div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
+  t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : 'Has arribat'}</span><h3>${treasure ? '★ ' : p.num + '. '}${esc(p.name)}</h3><div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
   t.hidden = false;
   $('tOpen').onclick = () => { t.hidden = true; openSheet(i); };
   $('tClose').onclick = () => { t.hidden = true; };
   speak(treasure ? `Enhorabona! Has trobat el ${p.name}.` : `Has arribat a ${p.name}.`);
   log((treasure ? 'Tresor: ' : 'Arribada: ') + p.name);
+}
+// A direction or warning: short notice, it does not count as a visited point.
+function arriveInfo(i) {
+  const p = POIS[i];
+  if (navigator.vibrate) navigator.vibrate(150);
+  showPop(i);
+  speak(p.name.toLowerCase());
+  log('Indicació: ' + p.name);
 }
 let wake = null;
 async function keepAwake() { try { if ('wakeLock' in navigator) { wake = await navigator.wakeLock.request('screen'); log('Pantalla sempre encesa: sí'); } } catch (e) { log('Pantalla sempre encesa: no (' + e.message + ')'); } }
@@ -666,9 +696,10 @@ addEventListener('popstate', () => { closeSheet(); show(false); });
   POIS = D.pois.map(p => { const [x, y] = toXY(p.lat, p.lon); return {...p, x, y, along: 0}; });
   POIS.forEach(p => p.along = snap([p.x, p.y]).along);
   POIS.sort((a, b) => a.along - b.along);
+  let num = 0; POIS.forEach(p => { if (!isInfo(p)) p.num = ++num; }); // numbered in walking order, information points apart
   buildLayers(); renderHome(); updateTreasures(); updateNext(0, NaN);
   $('profBox').hidden = !ELE.length; $('profSum').textContent = profSummary();
   if (ELE.length) $('sEle').textContent = Math.round(ELE[0]) + ' m';
-  log(`Ruta: ${fmtM(TOTAL)}, ${POIS.length} punts, ${orthoList().length} tessel·les d'ortofoto per descarregar`);
+  log(`Ruta: ${fmtM(TOTAL)}, ${POIS.filter(p => !isInfo(p)).length} punts d'interès, ${POIS.filter(isInfo).length} d'informació, ${orthoList().length} tessel·les d'ortofoto per descarregar`);
   checkOffline();
 })();

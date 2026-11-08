@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Natura Local · Parc Mataró</title>
 <meta name="description" content="Prototip de web app de Natura Local que funciona sense cobertura.">
+<meta name="robots" content="noindex">
 <meta name="theme-color" content="#322820">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -33,6 +34,7 @@
   </div>
   <section class="pad">
     <dl class="facts" id="rStats"></dl>
+    <a id="fitxaLink" class="fitxa-link" target="_blank" rel="noopener" hidden>Veure la fitxa a Natura Local ↗</a>
 
     <button id="startBtn" class="big primary">Comença la ruta</button>
     <button id="demoBtn" class="big demo">▶ Prova-la des de casa</button>
@@ -132,6 +134,7 @@
       <video id="shVideo" controls playsinline preload="none" hidden></video>
       <div class="row" id="shActions"></div>
       <div id="shBody" class="body"></div>
+      <a id="shFitxa" class="fitxa-link" target="_blank" rel="noopener" hidden>Veure la fitxa a Natura Local ↗</a>
     </div>
     <div class="sh-nav">
       <button id="shPrev">‹ Anterior</button>
