@@ -153,7 +153,9 @@ function openSheet(i) {
   const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada', it.dur], ['Desnivell', it.des], ['Dificultat', it.dif], ['Tipologia', it.tip]].filter(f => f[1]) : [];
   $('shFacts').innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   const acts = [];
-  if (it.g === 'ruta') acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
+  // routes with their own route app (points of interest, download): link to it; otherwise, the simple navigation here
+  if (it.app) acts.push(`<a class="btn primary grow" href="${it.app}">Navega la ruta</a><p class="appnote">${it.pts} punts d'interès. Des d'allà també la pots descarregar per anar sense cobertura.</p>`);
+  else if (it.g === 'ruta') acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
   if (it.tel) acts.push(`<a class="btn" href="tel:${esc(it.tel)}">📞 Truca</a>`);
   acts.push(`<button id="aMap">Veure al mapa</button>`);
   if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Fitxa a la web ↗</a>`);
@@ -294,7 +296,7 @@ function showPop(it) {
   const d = me ? ' · a ' + fmtM(dist([me.x, me.y], [it.x, it.y])) : '';
   const txt = it.g === 'ruta' ? [it.km + ' km', it.dur, it.des, it.dif].join(' · ') : plain(it.desc[0] || '').slice(0, 140);
   p.innerHTML = `<span class="t"><span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}${d}</span><h3>${esc(it.n)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}
-    <div class="row"><button class="primary grow" id="pMore">Més informació ›</button>${it.g === 'ruta' ? '<button id="pNav">Navega</button>' : ''}<button id="pClose" aria-label="Tanca">×</button></div>`;
+    <div class="row"><button class="primary grow" id="pMore">Més informació ›</button>${it.app ? `<a class="btn" href="${it.app}">Navega</a>` : it.g === 'ruta' ? '<button id="pNav">Navega</button>' : ''}<button id="pClose" aria-label="Tanca">×</button></div>`;
   p.hidden = nav != null;
   $('pMore').onclick = () => openSheet(it.i);
   if ($('pNav')) $('pNav').onclick = () => startNav(it);

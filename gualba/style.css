@@ -239,3 +239,5 @@ a.btn{display:inline-flex;align-items:center;gap:6px;font:700 .95rem var(--font)
 .know h3{margin:0 0 6px;color:var(--gold)}
 .know p{margin:0}
 .lead-flag{margin:16px 0 0}
+a.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--brown);font-weight:800;text-transform:uppercase;letter-spacing:.04em;justify-content:center}
+.appnote{flex:1 1 100%;margin:0;font-size:.84rem;color:var(--muted)}

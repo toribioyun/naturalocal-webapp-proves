@@ -113,16 +113,15 @@ const lon2tx = (lon, z) => (lon + 180) / 360 * 2 ** z;
 const lat2ty = (lat, z) => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z; };
 const tx2lon = (x, z) => x / 2 ** z * 360 - 180;
 const ty2lat = (y, z) => { const n = Math.PI - 2 * Math.PI * y / 2 ** z; return 180 / Math.PI * Math.atan(Math.sinh(n)); };
-// Tiles covering the route (with a 150 m margin), for the download.
+// Tiles along the route (150 m to each side), for the download: long routes must not fetch a whole rectangle.
+let orthoCache = null;
 function orthoList() {
-  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-  for (const p of [...TR, ...POIS.map(p => [p.x, p.y])]) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
-  const [la0, lo0] = toLL([x0 - 150, y0 - 150]), [la1, lo1] = toLL([x1 + 150, y1 + 150]);
-  const out = [];
-  for (const z of ORTO_DL_Z)
-    for (let x = Math.floor(lon2tx(lo0, z)); x <= Math.floor(lon2tx(lo1, z)); x++)
-      for (let y = Math.floor(lat2ty(la1, z)); y <= Math.floor(lat2ty(la0, z)); y++) out.push(ORTO_URL(z, x, y));
-  return out;
+  if (orthoCache) return orthoCache;
+  const set = new Set(), M = 150;
+  const add = p => { const [la, lo] = toLL(p); for (const z of ORTO_DL_Z) set.add(ORTO_URL(z, Math.floor(lon2tx(lo, z)), Math.floor(lat2ty(la, z)))); };
+  for (let d = 0; d <= TOTAL; d += 40) { const p = pointAt(d); for (const i of [-M, 0, M]) for (const j of [-M, 0, M]) add([p[0] + i, p[1] + j]); }
+  POIS.forEach(p => add([p.x, p.y]));
+  return orthoCache = [...set];
 }
 const downloadList = () => [...mediaList(), ...orthoList()];
 
@@ -141,7 +140,11 @@ function renderHome() {
     return `<li><button data-i="${i}"><span class="th">${th}<span class="num">${isTreasure(p) ? '★' : i + 1}</span></span><span><small>${esc(extra)}</small><b>${esc(p.name)}</b></span><span class="chev">›</span></button></li>`;
   }).join('');
   $('poiList').onclick = e => { const b = e.target.closest('button'); if (b) openSheet(+b.dataset.i); };
-  const mb = (8 + orthoList().length * ORTO_KB / 1000).toFixed(0);
+  const mediaMB = r.mediaMB || 8;
+  document.querySelectorAll('.mbOnline').forEach(e => e.textContent = `uns ${Math.round(mediaMB)} MB`);
+  document.title = 'Natura Local · ' + r.name;
+  if (r.back) { $('backLink').href = r.back; $('backLink').textContent = '‹ ' + r.backName; $('backLink').hidden = false; $('protoTag').hidden = true; }
+  const mb = (mediaMB + orthoList().length * ORTO_KB / 1000).toFixed(0);
   $('dlBtn').dataset.label = `Descarrega la ruta (uns ${mb} MB)`;
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
@@ -385,10 +388,13 @@ function paint() {
 function paintArrows() {
   const step = 55 / view.s;
   ctx.strokeStyle = '#322820'; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  let k = 1; // walks the track once, so long routes stay smooth
   for (let d = step / 2; d < TOTAL; d += step) {
-    const a = w2s(...pointAt(d)), b = w2s(...pointAt(Math.min(TOTAL, d + 1)));
+    while (k < TR.length - 1 && CUM[k] < d) k++;
+    const t = (d - CUM[k - 1]) / ((CUM[k] - CUM[k - 1]) || 1), P = TR[k - 1], Q = TR[k];
+    const a = w2s(P[0] + t * (Q[0] - P[0]), P[1] + t * (Q[1] - P[1])), b = w2s(Q[0], Q[1]), c = w2s(P[0], P[1]);
     if (a[0] < -20 || a[1] < -20 || a[0] > W + 20 || a[1] > H + 20) continue;
-    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const ang = Math.atan2(b[1] - c[1], b[0] - c[0]);
     ctx.save(); ctx.translate(a[0], a[1]); ctx.rotate(ang);
     ctx.beginPath(); ctx.moveTo(-3.5, -4.6); ctx.lineTo(2.5, 0); ctx.lineTo(-3.5, 4.6); ctx.stroke(); ctx.restore();
   }
@@ -402,7 +408,7 @@ function fitRoute() {
 }
 function zoom(f, sx, sy) {
   const before = sx != null ? s2w(sx, sy) : null;
-  view.s = Math.max(0.15, Math.min(12, view.s * f));
+  view.s = Math.max(0.02, Math.min(12, view.s * f));
   if (before && !follow) { const after = s2w(sx, sy); view.cx += before[0] - after[0]; view.cy += before[1] - after[1]; }
   draw();
 }
@@ -427,7 +433,7 @@ cv.addEventListener('pointermove', e => {
   if (ptrs.size === 1) {
     const a = s2w(prev[0], prev[1]), b = s2w(cur[0], cur[1]);
     if (Math.abs(cur[0] - prev[0]) + Math.abs(cur[1] - prev[1]) > 0) { if (follow) setFollow(false); view.cx += a[0] - b[0]; view.cy += a[1] - b[1]; draw(); }
-  } else if (ptrs.size === 2 && pinch0) { view.s = Math.max(0.15, Math.min(12, pinch0.s * pinchDist() / pinch0.d)); draw(); }
+  } else if (ptrs.size === 2 && pinch0) { view.s = Math.max(0.02, Math.min(12, pinch0.s * pinchDist() / pinch0.d)); draw(); }
 });
 const endPtr = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = null; };
 cv.addEventListener('pointerup', e => { const st = ptrs.get(e.pointerId), tap = ptrs.size === 1 && st && Math.hypot(st[0] - downXY[0], st[1] - downXY[1]) < 8; endPtr(e); if (tap) tapAt(e.offsetX, e.offsetY); });
@@ -565,7 +571,7 @@ function updateNext(i, d) {
   $('nDist').textContent = $('mDist').textContent = txt;
 }
 $('nextBtn').onclick = () => { const i = $('nextBtn').dataset.i; if (i != null) openSheet(+i); };
-function updateTreasures() { const n = POIS.filter(isTreasure).length; $('sTre').textContent = `${found.size}/${n}`; }
+function updateTreasures() { const n = POIS.filter(isTreasure).length; $('sTre').textContent = `${found.size}/${n}`; $('sTre').parentElement.hidden = !n; }
 function arrive(i, treasure) {
   const p = POIS[i];
   if (navigator.vibrate) navigator.vibrate(treasure ? [200, 100, 200, 100, 400] : [250, 120, 250]);
