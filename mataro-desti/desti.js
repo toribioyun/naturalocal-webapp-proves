@@ -53,7 +53,17 @@ function updateNet() { const on = navigator.onLine; $('net').textContent = on ? 
 addEventListener('online', () => { updateNet(); tiles.clear(); draw(); });
 addEventListener('offline', updateNet);
 document.addEventListener('error', e => { if (e.target.tagName === 'IMG') e.target.classList.add('broken'); }, true);
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  // A new version installs in the background: show it straight away (not at the next opening), unless navigating or reading a sheet.
+  const hadWorker = !!navigator.serviceWorker.controller;
+  let reloading = false, swReg = null;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadWorker || reloading || nav || !$('sheet').hidden) return;
+    reloading = true; location.reload();
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && swReg) swReg.update().catch(() => {}); });
+  navigator.serviceWorker.register('sw.js').then(r => { swReg = r; }).catch(() => {});
+}
 
 /* ---------- geometry (local metres around the destination) ---------- */
 let LAT0 = 0, LON0 = 0, KX = 0;

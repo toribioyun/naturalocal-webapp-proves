@@ -54,7 +54,15 @@ if (isIOS && !standalone) $('iosHint').hidden = false;
 log('Mode app instal·lada: ' + (standalone ? 'sí' : 'no'));
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').then(r => log('Service worker registrat (' + r.scope + ')'))
+  // A new version installs in the background: show it straight away (not at the next opening), unless the walker is busy.
+  const hadWorker = !!navigator.serviceWorker.controller;
+  let reloading = false, swReg = null;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadWorker || reloading || !$('nav').hidden || !$('sheet').hidden || $('offState').textContent.includes('%')) return;
+    reloading = true; location.reload();
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && swReg) swReg.update().catch(() => {}); });
+  navigator.serviceWorker.register('sw.js').then(r => { swReg = r; log('Service worker registrat (' + r.scope + ')'); })
     .catch(err => log('Service worker NO registrat: ' + err.message));
 } else log('Aquest navegador no té service worker: no funcionarà sense connexió en reobrir.');
 
@@ -150,7 +158,7 @@ function renderHome() {
   document.querySelectorAll('.mbOnline').forEach(e => e.textContent = `uns ${Math.round(mediaMB)} MB`);
   document.title = 'Natura Local · ' + r.name;
   if (r.url) { $('fitxaLink').href = r.url; $('fitxaLink').hidden = false; }
-  if (r.back) { $('backLink').href = r.back; $('backLink').textContent = '‹ ' + r.backName; $('backLink').hidden = false; $('protoTag').hidden = true; }
+  if (r.back) { $('backLink').href = r.back; $('backLink').textContent = '‹ Torna a ' + r.backName; $('backLink').hidden = false; $('protoTag').hidden = true; }
   const mb = (mediaMB + orthoList().length * ORTO_KB / 1000).toFixed(0);
   $('dlBtn').dataset.label = `Descarrega la ruta (uns ${mb} MB)`;
 }

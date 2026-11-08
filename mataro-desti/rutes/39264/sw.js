@@ -2,7 +2,7 @@
 // Cache-first for everything in this folder. Bump VERSION when files change.
 // App, data and map are always saved; media and ortho tiles (zoom ≤ 17) opened online are saved too
 // (nl-rutes), so the route keeps working if coverage is lost without having downloaded it.
-const VERSION = 'r4-20261108';
+const VERSION = 'r5-20261108';
 const SHELL = 'nlr39264-shell-' + VERSION;
 const ROUTES = 'nlr39264-media'; // media of downloaded routes (kept across app versions)
 const SHELL_FILES = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest',
@@ -11,7 +11,7 @@ const SHELL_FILES = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webman
 const ORTO_HOST = 'geoserveis.icgc.cat', ORTO_SAVE_MAX_Z = 17;
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES.map(f => new Request(f, {cache: 'reload'})))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(
