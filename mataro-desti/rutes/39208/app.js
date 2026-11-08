@@ -5,7 +5,8 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const MEDIA_CACHE = 'nlr39208-media';
-const NEAR_M = 20, TREASURE_M = 15, OFFROUTE_M = 40;
+const NEAR_M = 15, TREASURE_M = 15, OFFROUTE_M = 30, OFF_READINGS = 3; // Toribio, 08/11/2026
+const TRACK_M = 40; // progress keeps counting up to here: a GPS jump must not stop it
 // Free orthophoto of the ICGC (CC BY 4.0). Zooms 14–17 go in the download; 18–19 only online.
 const ORTO_URL = (z, x, y) => `https://geoserveis.icgc.cat/icc_mapesmultibase/noutm/wmts/orto/GRID3857/${z}/${x}/${y}.jpeg`;
 const ORTO_DL_Z = [14, 15, 16, 17], ORTO_MAX_Z = 19, ORTO_KB = 30;
@@ -101,7 +102,7 @@ const SIGNPOST = new Path2D('M-6-7.5H3.5L7-5 3.5-2.5H-6ZM6 .5H-3.5L-7 3-3.5 5.5H
 const isTreasure = p => /^tresor/i.test(p.name);
 // Information points (directions, warnings): on the map and as a notice, but not in the list of points of interest.
 const isInfo = p => p.kind === 'info';
-const hasContent = p => p.imgs.length || p.audio.length || p.video.length || /\S/.test((p.html || '').replace(/<[^>]*>|&nbsp;/g, ''));
+const hasContent = p => p.imgs.length || p.audio.length || p.video.length || /<img|<a /.test(p.html || '') || /\S/.test((p.html || '').replace(/<[^>]*>|&nbsp;/g, ''));
 function mediaList() {
   const s = new Set();
   D.route.imgs.forEach(f => s.add('media/' + f));
@@ -225,6 +226,9 @@ function openSheet(i) {
   missKinds.clear(); $('shMiss').hidden = true;
   if (!navigator.onLine) checkMissing(p);
   $('shBody').innerHTML = p.html || (isTreasure(p) ? `<p>${found.has(p.id) ? 'Tresor trobat! ★' : 'Apropa\'t a aquest punt per trobar el tresor.'}</p>` : '<p class="muted">Aquest punt encara no té text.</p>');
+  if (!navigator.onLine) $('shBody').querySelectorAll('a[href^="http"]').forEach(a => { // games and other links need the network
+    a.removeAttribute('href'); a.insertAdjacentHTML('afterend', '<small class="muted linknote">Aquest enllaç necessita connexió.</small>');
+  });
   const text = $('shBody').innerText.trim();
   $('shActions').innerHTML = text && 'speechSynthesis' in window ? '<button id="ttsBtn">🔊 Llegeix en veu alta</button>' : '';
   if ($('ttsBtn')) $('ttsBtn').onclick = () => speak(p.name + '. ' + text, true);
@@ -561,9 +565,9 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
   // simulation with the map turned to the walking direction (smoothly), as when walking with the phone in hand
   if (src === 'sim' && headingUp && heading != null) { const t = heading * Math.PI / 180; let d = t - view.rot; d = Math.atan2(Math.sin(d), Math.cos(d)); view.rot += d * 0.35; }
   const s = snap([x, y]);
-  $('offroute').hidden = s.off <= OFFROUTE_M;
+  checkOffRoute(s.off);
   // progress only advances when close to the track, and never jumps more than 120 m at once
-  if (s.off <= OFFROUTE_M) {
+  if (s.off <= TRACK_M) {
     if (!started) { started = true; maxAlong = s.along; } // first fix: start counting from where you join the route
     else if (s.along >= maxAlong - 30 && s.along <= maxAlong + 120) maxAlong = Math.max(maxAlong, s.along);
   }
@@ -575,14 +579,29 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
   let nextI = -1, nd = Infinity;
   POIS.forEach((p, i) => {
     const d = dist([x, y], [p.x, p.y]);
-    if (isInfo(p)) { if (d <= NEAR_M && !notified.has(p.id)) { notified.add(p.id); arriveInfo(i); } return; }
+    if (isInfo(p)) { if (isClose(p, d, s) && !notified.has(p.id)) { notified.add(p.id); arriveInfo(i); } return; }
     if (isTreasure(p) && d <= TREASURE_M && !found.has(p.id)) { found.add(p.id); arrive(i, true); }
-    else if (!isTreasure(p) && d <= NEAR_M && !notified.has(p.id)) { notified.add(p.id); visited.add(p.id); arrive(i, false); }
+    else if (!isTreasure(p) && isClose(p, d, s) && !notified.has(p.id)) { notified.add(p.id); visited.add(p.id); arrive(i, false); }
     if (!visited.has(p.id) && !found.has(p.id) && d < nd) { nd = d; nextI = i; }
   });
   updateNext(nextI, nd); updateTreasures(); drawProfile();
   if (follow) centreOn(x, y); else draw();
   if (src === 'gps') $('gpsNote').textContent = `GPS: precisió ±${Math.round(acc)} m · a ${Math.round(s.off)} m del track`;
+}
+// A point set back from the track would never be reached: it fires when passing the closest spot of the route.
+const isClose = (p, d, s) => d <= NEAR_M || (p.off > NEAR_M && s.off <= TRACK_M && Math.abs(s.along - p.along) <= NEAR_M);
+// Off the route only after several readings in a row (one bad GPS reading is not enough), and said once until back on it.
+let offCount = 0, offWarned = false;
+function checkOffRoute(off) {
+  offCount = off > OFFROUTE_M ? offCount + 1 : 0;
+  $('offroute').hidden = offCount < OFF_READINGS;
+  if (offCount >= OFF_READINGS && !offWarned) {
+    offWarned = true;
+    if (navigator.vibrate) navigator.vibrate([400, 150, 400]);
+    speak('Atenció, estàs fora de la ruta.');
+    log('Fora de la ruta: a ' + Math.round(off) + ' m del track');
+  }
+  if (off <= OFFROUTE_M - 10) offWarned = false;
 }
 function updateNext(i, d) {
   let badge, name, txt;
@@ -595,14 +614,14 @@ function updateNext(i, d) {
 $('nextBtn').onclick = () => { const i = $('nextBtn').dataset.i; if (i != null) openSheet(+i); };
 function updateTreasures() { const n = POIS.filter(isTreasure).length; $('sTre').textContent = `${found.size}/${n}`; $('sTre').parentElement.hidden = !n; }
 function arrive(i, treasure) {
-  const p = POIS[i];
+  const p = POIS[i], far = !treasure && p.off > NEAR_M; // far: seen from the track, not reached
   if (navigator.vibrate) navigator.vibrate(treasure ? [200, 100, 200, 100, 400] : [250, 120, 250]);
   const t = $('toast'); popIdx = -1; t.className = 'toast';
-  t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : 'Has arribat'}</span><h3>${treasure ? '★ ' : p.num + '. '}${esc(p.name)}</h3><div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
+  t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : far ? `A ${fmtM(dist([me.x, me.y], [p.x, p.y]))} de tu` : 'Has arribat'}</span><h3>${treasure ? '★ ' : p.num + '. '}${esc(p.name)}</h3><div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
   t.hidden = false;
   $('tOpen').onclick = () => { t.hidden = true; openSheet(i); };
   $('tClose').onclick = () => { t.hidden = true; };
-  speak(treasure ? `Enhorabona! Has trobat el ${p.name}.` : `Has arribat a ${p.name}.`);
+  speak(treasure ? `Enhorabona! Has trobat el ${p.name}.` : far ? `Tens a prop: ${p.name}.` : `Has arribat a ${p.name}.`);
   log((treasure ? 'Tresor: ' : 'Arribada: ') + p.name);
 }
 // A direction or warning: short notice, it does not count as a visited point.
@@ -641,7 +660,7 @@ function startSim() {
   if (gpsWatch != null) $('gpsBtn').click();
   speak('', true); // unlocks speech on iOS (needs a tap)
   let along = walked >= TOTAL - 1 ? 0 : Math.max(0, walked); started = true;
-  if (along === 0) { maxAlong = walked = 0; visited.clear(); found.clear(); notified.clear(); }
+  if (along === 0) { maxAlong = walked = 0; visited.clear(); found.clear(); notified.clear(); offCount = 0; offWarned = false; }
   headingUp = true; $('rotBtn').setAttribute('aria-pressed', true);
   view.s = Math.max(view.s, 2.2);
   simTimer = setInterval(() => {
@@ -694,7 +713,7 @@ addEventListener('popstate', () => { closeSheet(); show(false); });
   LAT0 = D.route.track[0][0]; LON0 = D.route.track[0][1]; KX = 111320 * Math.cos(LAT0 * Math.PI / 180);
   prepTrack();
   POIS = D.pois.map(p => { const [x, y] = toXY(p.lat, p.lon); return {...p, x, y, along: 0}; });
-  POIS.forEach(p => p.along = snap([p.x, p.y]).along);
+  POIS.forEach(p => { const s = snap([p.x, p.y]); p.along = s.along; p.off = s.off; });
   POIS.sort((a, b) => a.along - b.along);
   let num = 0; POIS.forEach(p => { if (!isInfo(p)) p.num = ++num; }); // numbered in walking order, information points apart
   buildLayers(); renderHome(); updateTreasures(); updateNext(0, NaN);
