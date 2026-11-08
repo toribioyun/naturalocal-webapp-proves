@@ -1,6 +1,6 @@
 // Service worker of the Mataró destination prototype (copied from desti-gualba by scripts/copia_app.py). Bump VERSION when files change.
 // App and data are saved on install; photos and ICGC map tiles (zoom ≤ 16) are saved as they are seen.
-const VERSION = 'm4-20261108';
+const VERSION = 'm5-20261108';
 const SHELL = 'nlm-shell-' + VERSION, SEEN = 'nlm-vist';
 const SHELL_FILES = ['./', 'index.html', 'desti.js', 'style.css', 'manifest.webmanifest', 'icones.js', 'icon-192.png', 'icon-512.png',
   'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2', 'fonts/raleway-latin-ext.woff2', 'data.json'];

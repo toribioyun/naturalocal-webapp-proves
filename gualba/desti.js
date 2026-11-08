@@ -161,12 +161,25 @@ function openSheet(i) {
   if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Veure la fitxa a Natura Local ↗</a>`);
   $('shActions').innerHTML = acts.join('');
   if ($('aNav')) $('aNav').onclick = () => { closeSheet(); startNav(it); };
+  const appLink = $('shActions').querySelector('a.primary');
+  if (appLink) appLink.onclick = rememberView;
   $('aMap').onclick = () => { closeSheet(); showOnMap(it); };
   $('shBody').innerHTML = [...(it.intro || []), ...(it.desc || [])].map(p => `<p>${p}</p>`).join('');
   $('sheet').hidden = false; $('sheet').querySelector('.sheet-in').scrollTop = 0;
 }
 $('shGal').addEventListener('scroll', () => { const g = $('shGal'), n = g.children.length; if (n > 1) $('shCount').textContent = `${Math.round(g.scrollLeft / g.clientWidth) + 1} / ${n}`; }, {passive: true});
 function closeSheet() { $('sheet').hidden = true; }
+// Going into a route app and back: same sheet, same tab and same filter as when leaving.
+function rememberView() { try { sessionStorage.setItem('nl-desti-vista', JSON.stringify({guia: !$('vGuia').hidden, filter})); } catch (e) {} }
+function restoreView() {
+  const id = location.hash.slice(1); if (!id) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  let v = null; try { v = JSON.parse(sessionStorage.getItem('nl-desti-vista')); } catch (e) {}
+  if (v && v.filter && (v.filter === 'tot' || ITEMS.some(i => i.g === v.filter))) { filter = v.filter; renderChips(); renderGuide(); draw(); }
+  if (v && v.guia) showTab(false);
+  const it = ITEMS.find(i => i.g === 'ruta' && String(i.id) === id);
+  if (it) openSheet(it.i);
+}
 $('shClose').onclick = closeSheet;
 $('sheet').onclick = e => { if (e.target === $('sheet')) closeSheet(); };
 
@@ -369,4 +382,5 @@ function simulate() {
   gallery($('dGal'), D.D.pics);
   renderChips(); renderGuide();
   resize(); fitAll();
+  restoreView();
 })();

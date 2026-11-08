@@ -24,8 +24,8 @@
 <!-- Home: route card, how to do it (online / downloaded), list of points -->
 <main id="home" class="screen">
   <header class="appbar">
-    <img src="logo.svg" alt="Natura Local" class="logo">
     <a id="backLink" class="backlink" hidden></a>
+    <img src="logo.svg" alt="Natura Local" class="logo">
     <span class="proto" id="protoTag">Prototip</span>
     <span id="net" class="net" aria-live="polite"></span>
   </header>
@@ -124,10 +124,10 @@
 <!-- Point sheet -->
 <div id="sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="shTitle">
   <div class="sheet-in">
+    <button id="shClose" class="round close" aria-label="Tanca">×</button>
     <div class="gal-wrap">
       <div class="gallery" id="shGal"></div>
       <span id="shCount" class="gcount" hidden></span>
-      <button id="shClose" class="round close" aria-label="Tanca">×</button>
     </div>
     <div class="pad">
       <div class="sh-meta"><span id="shTheme" class="theme"></span><span id="shDist" class="dist"></span></div>

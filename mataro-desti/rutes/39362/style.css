@@ -32,7 +32,8 @@ h2.sec{color:var(--olive);text-transform:uppercase;letter-spacing:.04em;font-siz
 #home{max-width:720px;margin:0 auto}
 .appbar{background:var(--brown);display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
 .logo{height:30px;width:auto;display:block}
-.backlink{color:var(--gold);font-weight:800;font-size:.9rem;text-decoration:none;white-space:nowrap}
+#home .appbar{position:sticky;top:0;z-index:20} /* the way back stays visible while scrolling the list */
+.backlink{background:var(--gold);color:var(--brown);font-weight:800;font-size:.9rem;text-decoration:none;white-space:nowrap;padding:8px 14px;border-radius:999px;flex:none}
 .proto{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;border:1.5px solid var(--gold);color:var(--gold);border-radius:4px;padding:1px 5px;font-weight:800}
 .net{margin-left:auto;font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;background:#e5efd2;color:#3f5a07}
 .net.off{background:var(--warn-bg);color:var(--warn-ink)}
@@ -127,7 +128,7 @@ img.broken{display:none}
 .gallery img{flex:0 0 100%;width:100%;aspect-ratio:16/10;object-fit:cover;scroll-snap-align:start;display:block}
 .gallery:empty{height:64px}
 .gcount{position:absolute;left:12px;bottom:10px;background:#000a;color:#fff;font-size:.75rem;font-weight:700;padding:2px 9px;border-radius:999px}
-.close{position:absolute;top:10px;right:10px;z-index:2}
+.close{position:sticky;top:10px;align-self:flex-end;flex:none;margin:10px 10px -54px 0;z-index:3} /* always within reach, however long the sheet */
 .sh-meta{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .mcount{display:flex;gap:10px;font-size:.78rem;font-weight:700;color:var(--muted)}
 .mcount:empty{display:none}
