@@ -127,6 +127,8 @@ img.broken{display:none}
 .prof summary .chev{margin-left:auto;color:var(--ink);transition:transform .2s}
 .prof[open] summary{border-color:var(--olive)}
 .prof[open] summary .chev{transform:rotate(180deg)}
+.profmode{display:flex;gap:6px;margin-top:8px}
+.profmode button{min-height:34px;padding:6px 12px;font-size:.8rem}
 #prof{display:block;width:100%;height:120px;margin-top:4px;touch-action:none}
 .note{font-size:.75rem;color:var(--muted);margin:0}
 

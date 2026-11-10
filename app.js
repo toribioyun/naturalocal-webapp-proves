@@ -522,6 +522,21 @@ document.addEventListener('fullscreenchange', () => { if (!document.fullscreenEl
 /* ---------- elevation profile ---------- */
 let profMark = null;
 const pc = $('prof');
+// The whole of a long route hardly moves while walking (1 px every ~50 m on a 14 km route), so by default the profile
+// shows the stretch you are on: 400 m behind and what comes next, up to 2 km (Toribio, 10/11/2026).
+const TRAM_M = 2000, TRAM_BACK_M = 400;
+let profMode = 'tram';
+const tramOn = () => profMode === 'tram' && TOTAL > TRAM_M * 1.5;
+function profRange() {
+  if (!tramOn()) return [0, TOTAL];
+  const b = Math.min(TOTAL, Math.max(0, (started ? walked : 0) - TRAM_BACK_M) + TRAM_M);
+  return [Math.max(0, b - TRAM_M), b];
+}
+$('profMode').onclick = e => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  profMode = btn.dataset.m; $('profMode').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === btn));
+  drawProfile(); log('Gràfica: ' + btn.textContent);
+};
 function drawProfile() {
   if (!ELE.length || $('profBox').hidden || !$('profBox').open) return;
   const r = pc.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
@@ -529,13 +544,18 @@ function drawProfile() {
   pc.width = r.width * dpr; pc.height = r.height * dpr;
   const g = pc.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const w = r.width, h = r.height, L = 44, B = 16, T = 8;
-  const lo = Math.floor(Math.min(...ELE) / 5) * 5, hi = Math.ceil(Math.max(...ELE) / 5) * 5 || lo + 5;
-  const X = d => L + (w - L - 6) * d / TOTAL, Y = e => T + (h - T - B) * (1 - (e - lo) / (hi - lo || 1));
+  const [a, b] = profRange();
+  let emin = Infinity, emax = -Infinity;
+  CUM.forEach((d, i) => { if (d >= a - 60 && d <= b + 60) { emin = Math.min(emin, ELE[i]); emax = Math.max(emax, ELE[i]); } });
+  const lo = Math.floor(emin / 5) * 5, hi = Math.max(Math.ceil(emax / 5) * 5, lo + 30); // at least 30 m high, so a flat stretch looks flat
+  const X = d => L + (w - L - 6) * (d - a) / ((b - a) || 1), Y = e => T + (h - T - B) * (1 - (e - lo) / (hi - lo || 1));
   const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--muted').trim(), olive = css.getPropertyValue('--olive').trim();
   g.clearRect(0, 0, w, h);
   g.font = '600 10px Raleway,system-ui,sans-serif'; g.fillStyle = ink; g.textAlign = 'right'; g.textBaseline = 'middle';
   g.fillText(hi + ' m', L - 4, Y(hi)); g.fillText(lo + ' m', L - 4, Y(lo));
-  g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText('0', X(0), h - 3); g.fillText(fmtM(TOTAL), X(TOTAL) - 14, h - 3);
+  g.textBaseline = 'alphabetic'; g.textAlign = 'left'; g.fillText(a ? 'km ' + (a / 1000).toFixed(1).replace('.', ',') : '0', L, h - 3);
+  g.textAlign = 'right'; g.fillText(b < TOTAL ? 'km ' + (b / 1000).toFixed(1).replace('.', ',') : fmtM(TOTAL), w - 2, h - 3);
+  g.save(); g.beginPath(); g.rect(L, 0, w - L, h); g.clip(); // only the stretch shown
   const path = () => { g.beginPath(); g.moveTo(X(0), Y(ELE[0])); CUM.forEach((d, i) => g.lineTo(X(d), Y(ELE[i]))); };
   path(); g.lineTo(X(TOTAL), Y(lo)); g.lineTo(X(0), Y(lo)); g.closePath(); g.fillStyle = 'rgba(233,188,0,.25)'; g.fill();
   path(); g.strokeStyle = '#c99f00'; g.lineWidth = 2; g.stroke();
@@ -552,10 +572,11 @@ function drawProfile() {
     g.fillStyle = col; g.beginPath(); g.arc(X(d), Y(e), 5.5, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); };
   if (started) mark(walked, '#1a73e8');
   if (profMark != null) mark(profMark, '#322820');
+  g.restore();
 }
 $('profBox').addEventListener('toggle', () => { drawProfile(); log('Perfil de desnivell: ' + ($('profBox').open ? 'obert' : 'tancat')); });
 // touching the profile shows that point on the map
-function profAt(e) { const r = pc.getBoundingClientRect(); return Math.max(0, Math.min(TOTAL, (e.clientX - r.left - 44) / (r.width - 50) * TOTAL)); }
+function profAt(e) { const r = pc.getBoundingClientRect(), [a, b] = profRange(); return Math.max(a, Math.min(b, a + (e.clientX - r.left - 44) / (r.width - 50) * (b - a))); }
 pc.addEventListener('pointerdown', e => { pc.setPointerCapture(e.pointerId); profMark = profAt(e); showProfMark(); });
 pc.addEventListener('pointermove', e => { if (profMark != null) { profMark = profAt(e); showProfMark(); } });
 const endProf = () => { if (profMark == null) return; profMark = null; drawProfile(); $('profSum').textContent = profSummary(); draw(); };
@@ -738,7 +759,7 @@ addEventListener('popstate', () => { closeSheet(); show(false); });
   let num = 0; POIS.forEach(p => { if (!isInfo(p)) p.num = ++num; }); // numbered in walking order, information points apart
   buildLayers(); renderHome(); updateTreasures(); updateNext(0, NaN);
   buildClimb();
-  $('profBox').hidden = !ELE.length; $('profSum').textContent = profSummary();
+  $('profBox').hidden = !ELE.length; $('profSum').textContent = profSummary(); $('profMode').hidden = TOTAL <= TRAM_M * 1.5;
   document.querySelectorAll('.stat.ele').forEach(t => t.hidden = !ELE.length); showClimb();
   log(`Ruta: ${fmtM(TOTAL)}, ${POIS.filter(p => !isInfo(p)).length} punts d'interès, ${POIS.filter(isInfo).length} d'informació, ${orthoList().length} tessel·les d'ortofoto per descarregar`);
   checkOffline();
