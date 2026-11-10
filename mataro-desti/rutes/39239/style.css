@@ -85,6 +85,7 @@ img.broken{display:none}
 .maptop{position:absolute;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));display:flex;gap:8px;align-items:center;pointer-events:none}
 .maptop>*{pointer-events:auto}
 .maptop .net{margin-left:0}
+.backpill{min-height:44px;padding:10px 16px;border:0;border-radius:999px;background:var(--panel);color:var(--brown);font-weight:800;box-shadow:0 1px 5px #0004;white-space:nowrap} /* back to the route sheet, with words (Toribio, 10/11/2026) */
 #fullBtn{margin-left:auto}
 .round{width:44px;height:44px;border-radius:50%;padding:0;font-size:1.45rem;line-height:1;box-shadow:0 1px 5px #0004;background:#fff;color:var(--brown);border:0}
 .mapbtns{position:absolute;right:10px;top:calc(64px + env(safe-area-inset-top));display:flex;flex-direction:column;gap:8px}
@@ -106,16 +107,26 @@ img.broken{display:none}
 #nav.full .card{display:none}
 #nav.full .attr{bottom:calc(84px + env(safe-area-inset-bottom))}
 .card{background:var(--panel);border-top:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));display:grid;gap:8px;max-height:60%;overflow:auto}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.stat b{display:block;font-size:1.08rem;font-variant-numeric:tabular-nums;white-space:nowrap}
-.stat span{font-size:.62rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+/* dashboard tiles (Toribio, 10/11/2026: more visual, like boxes) */
+.stats{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px}
+.stat{background:var(--bg);border:1px solid var(--line);border-top:4px solid var(--brown-2);border-radius:12px;padding:6px 4px 7px;text-align:center;min-width:0}
+.stat.done{border-top-color:var(--olive)}
+.stat b{display:block;font-size:1.12rem;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.25}
+.stat span{display:block;font-size:.6rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .next{display:flex;gap:10px;align-items:center;text-align:left;font-weight:400;padding:6px 10px;min-width:0;border-radius:14px}
 .next>span:nth-child(2){min-width:0}
 .next small{display:block;color:var(--muted);font-size:.78rem}
 .next strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .badge{flex:none;width:32px;height:32px;border-radius:50%;background:var(--brown);color:#fff;display:grid;place-items:center;font-weight:800;font-size:.9rem}
-.prof summary{font-weight:700;font-size:.9rem;cursor:pointer;padding:4px 0}
-.prof summary span{font-weight:400;font-size:.82rem}
+/* the elevation profile opens from a real button (Toribio, 10/11/2026: the text link was hard to see) */
+.prof summary{list-style:none;display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);font-weight:800;font-size:.95rem;cursor:pointer;color:var(--ink)}
+.prof summary::-webkit-details-marker{display:none}
+.prof summary svg{color:var(--olive);flex:none}
+.prof summary .pt{white-space:nowrap}
+.prof summary #profSum{font-weight:400;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.prof summary .chev{margin-left:auto;color:var(--ink);transition:transform .2s}
+.prof[open] summary{border-color:var(--olive)}
+.prof[open] summary .chev{transform:rotate(180deg)}
 #prof{display:block;width:100%;height:120px;margin-top:4px;touch-action:none}
 .note{font-size:.75rem;color:var(--muted);margin:0}
 

@@ -94,6 +94,14 @@ function snap(p) {
   return best;
 }
 // Point (and elevation) at a distance along the track.
+// Climb done up to each track point. Small ups and downs (< 5 m) are noise of the elevation data and are not added.
+let UP = [];
+function buildClimb() {
+  UP = []; if (!ELE.length) return;
+  let ref = ELE[0], up = 0;
+  ELE.forEach(e => { if (e - ref >= 5) { up += e - ref; ref = e; } else if (ref - e >= 5) ref = e; UP.push(up); });
+}
+const climbAt = along => UP.length ? UP[Math.max(0, at(along).i - 1)] : null;
 function at(along) {
   for (let i = 1; i < TR.length; i++) if (CUM[i] >= along) {
     const t = (along - CUM[i - 1]) / ((CUM[i] - CUM[i - 1]) || 1);
@@ -520,7 +528,7 @@ function drawProfile() {
   if (!r.width) return;
   pc.width = r.width * dpr; pc.height = r.height * dpr;
   const g = pc.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const w = r.width, h = r.height, L = 30, B = 16, T = 8;
+  const w = r.width, h = r.height, L = 44, B = 16, T = 8;
   const lo = Math.floor(Math.min(...ELE) / 5) * 5, hi = Math.ceil(Math.max(...ELE) / 5) * 5 || lo + 5;
   const X = d => L + (w - L - 6) * d / TOTAL, Y = e => T + (h - T - B) * (1 - (e - lo) / (hi - lo || 1));
   const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--muted').trim(), olive = css.getPropertyValue('--olive').trim();
@@ -547,7 +555,7 @@ function drawProfile() {
 }
 $('profBox').addEventListener('toggle', () => { drawProfile(); log('Perfil de desnivell: ' + ($('profBox').open ? 'obert' : 'tancat')); });
 // touching the profile shows that point on the map
-function profAt(e) { const r = pc.getBoundingClientRect(); return Math.max(0, Math.min(TOTAL, (e.clientX - r.left - 30) / (r.width - 36) * TOTAL)); }
+function profAt(e) { const r = pc.getBoundingClientRect(); return Math.max(0, Math.min(TOTAL, (e.clientX - r.left - 44) / (r.width - 50) * TOTAL)); }
 pc.addEventListener('pointerdown', e => { pc.setPointerCapture(e.pointerId); profMark = profAt(e); showProfMark(); });
 pc.addEventListener('pointermove', e => { if (profMark != null) { profMark = profAt(e); showProfMark(); } });
 const endProf = () => { if (profMark == null) return; profMark = null; drawProfile(); $('profSum').textContent = profSummary(); draw(); };
@@ -558,8 +566,7 @@ function showProfMark() {
 }
 function profSummary() {
   if (!ELE.length) return '';
-  let up = 0, down = 0; for (let i = 1; i < ELE.length; i++) { const d = ELE[i] - ELE[i - 1]; d > 0 ? up += d : down -= d; }
-  return `· +${Math.round(up)} m / −${Math.round(down)} m`;
+  return `· ↗ ${Math.round(UP[UP.length - 1])} m`;
 }
 
 /* ---------- position: GPS or simulation ---------- */
@@ -582,7 +589,7 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
   walked = maxAlong;
   $('progBar').style.width = (100 * walked / TOTAL) + '%';
   $('sDone').textContent = fmtM(walked); $('sLeft').textContent = fmtM(Math.max(0, TOTAL - walked));
-  const e = at(s.along).ele; if (e != null) $('sEle').textContent = Math.round(e) + ' m';
+  showClimb();
   // proximity to points
   let nextI = -1, nd = Infinity;
   POIS.forEach((p, i) => {
@@ -620,6 +627,11 @@ function updateNext(i, d) {
   $('nDist').textContent = $('mDist').textContent = txt;
 }
 $('nextBtn').onclick = () => { const i = $('nextBtn').dataset.i; if (i != null) openSheet(+i); };
+function showClimb() {
+  if (!UP.length) return;
+  const done = climbAt(walked), all = UP[UP.length - 1];
+  $('sUp').textContent = Math.round(done) + ' m'; $('sUpLeft').textContent = Math.round(all - done) + ' m';
+}
 function updateTreasures() { const n = POIS.filter(isTreasure).length; $('sTre').textContent = `${found.size}/${n}`; $('sTre').parentElement.hidden = !n; }
 function arrive(i, treasure) {
   const p = POIS[i], far = !treasure && p.off > NEAR_M; // far: seen from the track, not reached
@@ -725,8 +737,9 @@ addEventListener('popstate', () => { closeSheet(); show(false); });
   POIS.sort((a, b) => a.along - b.along);
   let num = 0; POIS.forEach(p => { if (!isInfo(p)) p.num = ++num; }); // numbered in walking order, information points apart
   buildLayers(); renderHome(); updateTreasures(); updateNext(0, NaN);
+  buildClimb();
   $('profBox').hidden = !ELE.length; $('profSum').textContent = profSummary();
-  if (ELE.length) $('sEle').textContent = Math.round(ELE[0]) + ' m';
+  document.querySelectorAll('.stat.ele').forEach(t => t.hidden = !ELE.length); showClimb();
   log(`Ruta: ${fmtM(TOTAL)}, ${POIS.filter(p => !isInfo(p)).length} punts d'interès, ${POIS.filter(isInfo).length} d'informació, ${orthoList().length} tessel·les d'ortofoto per descarregar`);
   checkOffline();
 })();
