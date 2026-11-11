@@ -42,10 +42,12 @@ h2.sec{color:var(--olive);text-transform:uppercase;letter-spacing:.04em;font-siz
 .hero-txt h1{margin:4px 0 0;font-size:1.7rem;text-transform:uppercase;letter-spacing:.01em;text-shadow:0 1px 3px #0006}
 .kind{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;background:var(--olive);padding:3px 10px 3px 4px;border-radius:999px}
 .kind img{width:18px;height:18px;background:var(--brown);border-radius:50%;padding:2px}
-.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 10px;margin:0 0 18px}
-.facts div{min-width:0}
+/* technical data in boxes, like the navigation tiles (Toribio, 11/11/2026) */
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 18px}
+.facts div{min-width:0;background:var(--bg);border:1px solid var(--line);border-top:3px solid var(--olive);border-radius:12px;padding:7px 10px 8px}
 .facts dt{font-size:.66rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .facts dd{margin:0;font-weight:700;font-size:.98rem}
+.facts .wide{grid-column:1/-1} /* the theme is long: a whole row, so the other boxes stay small */
 .big{width:100%;padding:15px;font-size:1.08rem}
 .cta-note{font-size:.84rem;color:var(--muted);margin:8px 4px 0}
 .box{margin:22px 0 0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:10px}
@@ -122,7 +124,11 @@ img.broken{display:none}
 .gallery::-webkit-scrollbar{display:none}
 .gallery img{flex:0 0 100%;width:100%;aspect-ratio:16/10;object-fit:cover;scroll-snap-align:start;display:block}
 .gallery:empty{height:64px}
-.gcount{position:absolute;left:12px;bottom:10px;background:#000a;color:#fff;font-size:.75rem;font-weight:700;padding:2px 9px;border-radius:999px}
+/* dots under the photos: you can swipe (Toribio, 11/11/2026) */
+.gdots{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:6px;pointer-events:none}
+.gdots.top{top:12px;bottom:auto}
+.gdots i{width:8px;height:8px;border-radius:4px;background:#fff9;box-shadow:0 0 3px #0009;transition:width .2s,background .2s}
+.gdots i.on{width:22px;background:#fff}
 .close{position:sticky;top:10px;align-self:flex-end;flex:none;margin:10px 10px -54px 0;z-index:3} /* always within reach, however long the sheet */
 .sh-meta{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .mcount{display:flex;gap:10px;font-size:.78rem;font-weight:700;color:var(--muted)}
@@ -139,6 +145,21 @@ video{width:100%;border-radius:14px;background:#000;margin:0 0 10px;display:bloc
 .body{overflow-x:auto;font-size:1rem}
 .body img{max-width:100%;height:auto;border-radius:10px}
 .body h2,.body h3{color:var(--olive)}
+.body .rtitle{color:var(--ink);font-size:1.12rem;margin:4px 0 8px}
+.readmore .rm-text{max-height:7.6em;overflow:hidden;position:relative}
+.readmore .rm-text::after{content:"";position:absolute;inset:auto 0 0 0;height:3em;background:linear-gradient(transparent,var(--panel))}
+.readmore.open .rm-text{max-height:none}
+.readmore.open .rm-text::after{display:none}
+.rm-btn,.fold>summary{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 16px;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);font-weight:800;color:var(--ink);cursor:pointer;margin:6px 0 10px}
+.rm-btn .chev,.fold>summary .chev{transition:transform .2s}
+.readmore.open .rm-btn .chev,.fold[open]>summary .chev{transform:rotate(180deg)}
+.fold>summary{list-style:none;justify-content:space-between;font-size:1rem}
+.fold>summary::-webkit-details-marker{display:none}
+.fold[open]>summary{border-color:var(--olive)}
+.fold h4{margin:14px 0 4px;color:var(--olive);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase}
+.fold ul{margin:0;padding-left:1.2em}
+.fold li{margin:3px 0}
+.fold li::marker{color:var(--olive)}
 .body table{border-collapse:collapse;font-size:.88rem;min-width:520px}
 .body td,.body th{border:1px solid var(--line);padding:6px;vertical-align:top}
 .body td p{margin:0}

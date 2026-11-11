@@ -153,8 +153,8 @@ function renderHome() {
   $('heroImg').src = 'media/' + r.imgs[0];
   const facts = [['Distància', r.distancia.replace('.00', '').replace('.', ',')], ['Durada', r.durada],
     ['Desnivell', r.desnivell.replace('.00', '').replace(' meters', ' m')], ['Dificultat', r.dificultat],
-    ['Tipologia', r.tipus], ['Tema', r.tema]].filter(f => f[1]);
-  $('rStats').innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
+    ['Tipologia', r.tipus], ['Temàtica', r.tema]].filter(f => f[1]);
+  $('rStats').innerHTML = facts.map(([k, v]) => `<div${k === 'Temàtica' ? ' class="wide"' : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   $('poiList').innerHTML = POIS.map((p, i) => {
     if (isInfo(p)) return '';
     const th = p.imgs[0] ? `<img src="media/${p.imgs[0]}" alt="" loading="lazy">` : `<span class="ph">${isTreasure(p) ? '★' : '•'}</span>`;
@@ -225,6 +225,10 @@ $('copyDiag').onclick = async () => {
 function alertMsg(t) { $('offText').textContent = t; $('offText').hidden = false; }
 
 /* ---------- point sheet ---------- */
+// Dots under a gallery: one per photo, the current one longer, so it is clear that you can swipe (Toribio, 11/11/2026).
+function setDots(el, n) { el.hidden = n < 2; el.innerHTML = '<i class="on"></i>' + '<i></i>'.repeat(Math.max(0, n - 1)); }
+function moveDots(el, g) { const k = Math.round(g.scrollLeft / (g.clientWidth || 1)); el.querySelectorAll('i').forEach((x, j) => x.classList.toggle('on', j === k)); }
+
 let sheetIdx = -1;
 function openSheet(i) {
   const p = POIS[i]; sheetIdx = i;
@@ -235,7 +239,7 @@ function openSheet(i) {
   $('shCountM').innerHTML = [[p.audio.length, '🔊 àudio'], [p.imgs.length, '🖼 ' + (p.imgs.length > 1 ? 'fotos' : 'foto')], [p.video.length, '▶ vídeo']]
     .filter(m => m[0]).map(m => `<span>${m[1].replace(' ', ' ' + m[0] + ' ')}</span>`).join('');
   $('shGal').scrollLeft = 0;
-  $('shCount').hidden = p.imgs.length < 2; $('shCount').textContent = `1 / ${p.imgs.length}`;
+  setDots($('shDots'), p.imgs.length);
   const au = $('shAudio'), vi = $('shVideo');
   $('shAudioBox').hidden = !p.audio.length; au.src = p.audio.length ? 'media/' + p.audio[0] : '';
   vi.hidden = !p.video.length; vi.src = p.video.length ? 'media/' + p.video[0] : '';
@@ -254,7 +258,7 @@ function openSheet(i) {
 }
 $('shGal').addEventListener('scroll', () => {
   const g = $('shGal'), n = g.children.length;
-  if (n > 1) $('shCount').textContent = `${Math.round(g.scrollLeft / g.clientWidth) + 1} / ${n}`;
+  if (n > 1) moveDots($('shDots'), g);
 }, {passive: true});
 // Previous / next skip the information points.
 function stepIdx(i, dir) { for (let j = i + dir; j >= 0 && j < POIS.length; j += dir) if (!isInfo(POIS[j])) return j; return -1; }

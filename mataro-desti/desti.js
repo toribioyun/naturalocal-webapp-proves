@@ -114,6 +114,9 @@ function showTab(map) {
 $('tMapa').onclick = () => showTab(true); $('tGuia').onclick = () => showTab(false);
 
 /* ---------- guide ---------- */
+// Dots under a gallery: one per photo, the current one longer, so it is clear that you can swipe (Toribio, 11/11/2026).
+function setDots(el, n) { el.hidden = n < 2; el.innerHTML = '<i class="on"></i>' + '<i></i>'.repeat(Math.max(0, n - 1)); }
+function moveDots(el, g) { const k = Math.round(g.scrollLeft / (g.clientWidth || 1)); el.querySelectorAll('i').forEach((x, j) => x.classList.toggle('on', j === k)); }
 function gallery(el, pics) { el.innerHTML = pics.map(([f, c]) => `<img src="${f}" alt="${esc(c)}" loading="lazy">`).join(''); el.scrollLeft = 0; }
 function renderGuide() {
   const sec = (g, title) => {
@@ -156,12 +159,12 @@ $('guide').onclick = e => { const b = e.target.closest('button[data-i]'); if (b)
 function openSheet(i) {
   const it = ITEMS[i];
   gallery($('shGal'), it.pics);
-  $('shCount').hidden = it.pics.length < 2; $('shCount').textContent = `1 / ${it.pics.length}`;
+  setDots($('shDots'), it.pics.length);
   $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}`;
   $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [it.x, it.y])) + ' de tu' : '';
   $('shTitle').textContent = it.n;
-  const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada', it.dur], ['Desnivell', it.des], ['Dificultat', it.dif], ['Tipologia', it.tip]].filter(f => f[1]) : [];
-  $('shFacts').innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
+  const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada', it.dur], ['Desnivell', it.des], ['Dificultat', it.dif], ['Tipologia', it.tip], ['Temàtica', it.tema]].filter(f => f[1]) : [];
+  $('shFacts').innerHTML = facts.map(([k, v]) => `<div${k === 'Temàtica' ? ' class="wide"' : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   const acts = [];
   // routes with their own route app (points of interest, download): link to it; otherwise, the simple navigation here
   if (it.app) acts.push(`<a class="btn primary grow" href="${it.app}">Navega la ruta</a><p class="appnote">${it.pts} punts d'interès. Des d'allà també la pots descarregar per anar sense cobertura.</p>`);
@@ -174,11 +177,31 @@ function openSheet(i) {
   const appLink = $('shActions').querySelector('a.primary');
   if (appLink) appLink.onclick = rememberView;
   $('aMap').onclick = () => { closeSheet(); showOnMap(it); };
-  $('shBody').innerHTML = [...(it.intro || []), ...(it.desc || [])].map(p => `<p>${p}</p>`).join('');
+  $('shBody').innerHTML = it.g === 'ruta' ? routeText(it) : (it.desc || []).map(p => `<p>${p}</p>`).join('');
   $('sheet').hidden = false; $('sheet').querySelector('.sheet-in').scrollTop = 0;
 }
-$('shGal').addEventListener('scroll', () => { const g = $('shGal'), n = g.children.length; if (n > 1) $('shCount').textContent = `${Math.round(g.scrollLeft / g.clientWidth) + 1} / ${n}`; }, {passive: true});
+$('shGal').addEventListener('scroll', () => moveDots($('shDots'), $('shGal')), {passive: true});
+$('dGal').addEventListener('scroll', () => moveDots($('dDots'), $('dGal')), {passive: true});
 function closeSheet() { $('sheet').hidden = true; }
+// Text of a route as on the web: title of the introduction, the description folded under «Llegeix-ne més»,
+// and the advice by sections (Traçat, Aigua…) with their points, folded too (Toribio, 11/11/2026).
+const CHEV = '<svg class="chev" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function routeText(it) {
+  const intro = (it.intro || []).map(p => `<p>${p}</p>`).join('');
+  let h = (it.introTitle ? `<h3 class="rtitle">${esc(it.introTitle)}</h3>` : '')
+    + (intro ? `<div class="readmore"><div class="rm-text">${intro}</div><button class="rm-btn" type="button"><span>Llegeix-ne més</span>${CHEV}</button></div>` : '');
+  if (it.consells && it.consells.length) {
+    h += `<details class="fold"><summary>Consells${CHEV}</summary>${it.consells.map(c =>
+      (c.t ? `<h4>${esc(c.t)}</h4>` : '') + `<ul>${c.p.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</details>`;
+  } else if (it.desc && it.desc.length) { // destinations read without sections (Gualba): the rest of the text, folded
+    h += `<details class="fold"><summary>Més informació${CHEV}</summary>${it.desc.map(p => `<p>${p}</p>`).join('')}</details>`;
+  }
+  return h;
+}
+$('shBody').addEventListener('click', e => {
+  const b = e.target.closest('.rm-btn'); if (!b) return;
+  const open = b.parentElement.classList.toggle('open'); b.querySelector('span').textContent = open ? 'Mostra\'n menys' : 'Llegeix-ne més';
+});
 // Going into a route app and back: same sheet, same tab and same filter as when leaving.
 function rememberView() { try { sessionStorage.setItem('nl-desti-vista', JSON.stringify({guia: !$('vGuia').hidden, filter})); } catch (e) {} }
 function restoreView() {
@@ -389,7 +412,7 @@ function simulate() {
   prepare(); for (const it of ITEMS) byName[it.n] = it;
   setLayer('osm');
   $('dName').textContent = D.D.nom; document.title = 'Natura Local · ' + D.D.nom;
-  gallery($('dGal'), D.D.pics);
+  gallery($('dGal'), D.D.pics); setDots($('dDots'), D.D.pics.length);
   renderChips(); renderGuide();
   resize(); fitAll();
   restoreView();

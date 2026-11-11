@@ -43,10 +43,13 @@ h2.sec{color:var(--olive);text-transform:uppercase;letter-spacing:.04em;font-siz
 .hero-txt h1{margin:4px 0 0;font-size:1.7rem;text-transform:uppercase;letter-spacing:.01em;text-shadow:0 1px 3px #0006}
 .kind{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;background:var(--olive);padding:3px 10px 3px 4px;border-radius:999px}
 .kind img{width:18px;height:18px;background:var(--brown);border-radius:50%;padding:2px}
-.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 10px;margin:0 0 18px}
-.facts div{min-width:0}
+/* technical data in boxes, like the navigation tiles (Toribio, 11/11/2026) */
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 18px}
+.facts div{min-width:0;background:var(--bg);border:1px solid var(--line);border-top:3px solid var(--olive);border-radius:12px;padding:7px 10px 8px}
 .facts dt{font-size:.66rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .facts dd{margin:0;font-weight:700;font-size:.98rem}
+.facts .wide{grid-column:1/-1} /* the theme is long: a whole row, so the other boxes stay small */
+#home .facts div{background:var(--panel)}
 .big{width:100%;padding:15px;font-size:1.08rem}
 .demo{margin-top:10px;background:var(--brown);border-color:var(--brown);color:var(--gold)}
 .cta-note{font-size:.84rem;color:var(--muted);margin:8px 4px 0}
@@ -140,7 +143,11 @@ img.broken{display:none}
 .gallery::-webkit-scrollbar{display:none}
 .gallery img{flex:0 0 100%;width:100%;aspect-ratio:16/10;object-fit:cover;scroll-snap-align:start;display:block}
 .gallery:empty{height:64px}
-.gcount{position:absolute;left:12px;bottom:10px;background:#000a;color:#fff;font-size:.75rem;font-weight:700;padding:2px 9px;border-radius:999px}
+/* dots under the photos: you can swipe (Toribio, 11/11/2026) */
+.gdots{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:6px;pointer-events:none}
+.gdots.top{top:12px;bottom:auto}
+.gdots i{width:8px;height:8px;border-radius:4px;background:#fff9;box-shadow:0 0 3px #0009;transition:width .2s,background .2s}
+.gdots i.on{width:22px;background:#fff}
 .close{position:sticky;top:10px;align-self:flex-end;flex:none;margin:10px 10px -54px 0;z-index:3} /* always within reach, however long the sheet */
 .sh-meta{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .mcount{display:flex;gap:10px;font-size:.78rem;font-weight:700;color:var(--muted)}
