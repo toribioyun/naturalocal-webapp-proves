@@ -183,13 +183,13 @@ function openSheet(i) {
 $('shGal').addEventListener('scroll', () => moveDots($('shDots'), $('shGal')), {passive: true});
 $('dGal').addEventListener('scroll', () => moveDots($('dDots'), $('dGal')), {passive: true});
 function closeSheet() { $('sheet').hidden = true; }
-// Text of a route as on the web: title of the introduction, the description folded under «Llegeix-ne més»,
-// and the advice by sections (Traçat, Aigua…) with their points, folded too (Toribio, 11/11/2026).
+// Text of a route as on the web: the introduction (title and text) in full, and below it two folded parts,
+// «Descripció» (the walk, step by step) and «Consells» by sections (Traçat, Aigua…) with their points (Toribio, 11/11/2026).
 const CHEV = '<svg class="chev" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function routeText(it) {
   const intro = (it.intro || []).map(p => `<p>${p}</p>`).join('');
-  let h = (it.introTitle ? `<h3 class="rtitle">${esc(it.introTitle)}</h3>` : '')
-    + (intro ? `<div class="readmore"><div class="rm-text">${intro}</div><button class="rm-btn" type="button"><span>Llegeix-ne més</span>${CHEV}</button></div>` : '');
+  let h = (it.introTitle ? `<h3 class="rtitle">${esc(it.introTitle)}</h3>` : '') + intro;
+  if (it.descr && it.descr.length) h += `<details class="fold"><summary>Descripció de la ruta${CHEV}</summary>${it.descr.map(p => `<p>${p}</p>`).join('')}</details>`;
   if (it.consells && it.consells.length) {
     h += `<details class="fold"><summary>Consells${CHEV}</summary>${it.consells.map(c =>
       (c.t ? `<h4>${esc(c.t)}</h4>` : '') + `<ul>${c.p.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</details>`;
