@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Natura Local · Vallirana</title>
+<meta name="description" content="Prototip de web app de Natura Local: el destí de Vallirana amb visites, serveis i rutes al mapa.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#322820">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vallirana">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="fulla.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="appbar">
+    <img src="logo.svg" alt="Natura Local" class="logo">
+    <span class="proto">Prototip</span>
+    <span id="net" class="net" aria-live="polite"></span>
+  </header>
+  <div class="chips" id="chips" role="group" aria-label="Què vols veure"></div>
+
+  <!-- Map with every resource of the destination -->
+  <section id="vMapa" class="view" role="tabpanel">
+    <canvas id="map" aria-label="Mapa del destí amb visites, serveis i rutes"></canvas>
+    <div class="mapbtns">
+      <button id="layerBtn" class="layer" title="Tria el mapa de fons">Capes</button>
+      <button id="zin" aria-label="Apropa">+</button>
+      <button id="zout" aria-label="Allunya">−</button>
+      <button id="meBtn" aria-pressed="false" title="On soc">◎</button>
+    </div>
+    <div id="layerMenu" class="layermenu" hidden></div>
+    <div id="navBar" class="navbar" hidden>
+      <div class="navbar-top"><span class="t">Navegant</span><strong id="navName"></strong><button id="simBtn" class="small">Simula</button><button id="navStop" class="small">Surt</button></div>
+      <div class="bar"><i id="progBar"></i></div>
+      <div class="stats">
+        <div class="stat"><b id="sDone">0 m</b><span>Fet</span></div>
+        <div class="stat"><b id="sLeft">–</b><span>Falta</span></div>
+        <div class="stat"><b id="sOff">–</b><span>Del track</span></div>
+      </div>
+      <p id="gpsNote" class="note"></p>
+    </div>
+    <div id="offroute" class="offroute" hidden>Fora de la ruta</div>
+    <div id="pop" class="toast info" hidden></div>
+    <div id="attr" class="attr">© ICGC</div>
+  </section>
+
+  <!-- Guide: the same resources as a list -->
+  <section id="vGuia" class="view" role="tabpanel" hidden>
+    <div class="hero">
+      <div class="gallery" id="dGal"></div>
+      <span id="dDots" class="gdots top" hidden></span>
+      <div class="hero-txt">
+        <span class="kind"><img src="fulla.svg" alt=""> Destí</span>
+        <h1 id="dName"></h1>
+      </div>
+    </div>
+    <div class="pad" id="guide"></div>
+    <p class="foot pad">Mapes: © col·laboradors d'OpenStreetMap (ODbL) · © Institut Cartogràfic i Geològic de Catalunya (CC BY 4.0). Icones: Maki (CC0). Continguts: Natura Local.</p>
+  </section>
+  <!-- Bottom tab bar: the usual mobile pattern, so it reads as buttons -->
+  <nav class="tabbar" role="tablist" aria-label="Vistes">
+    <button id="tMapa" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M9 3 3 5.5v15.5l6-2.5 6 2.5 6-2.5V3l-6 2.5zm0 2.2 6 2.5v11.1l-6-2.5zM5 6.8l2-.8v11.1l-2 .8zm12 .2 2-.8v11.1l-2 .8z" fill="currentColor"/></svg>Mapa</button>
+    <button id="tGuia" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M4 5h2v2H4zm4 0h12v2H8zM4 11h2v2H4zm4 0h12v2H8zm-4 6h2v2H4zm4 0h12v2H8z" fill="currentColor"/></svg>Guia</button>
+  </nav>
+</div>
+
+<!-- Detail sheet -->
+<div id="sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="shTitle">
+  <div class="sheet-in">
+    <button id="shClose" class="round close" aria-label="Tanca">×</button>
+    <div class="gal-wrap">
+      <div class="gallery" id="shGal"></div>
+      <span id="shDots" class="gdots" hidden></span>
+    </div>
+    <div class="pad">
+      <div class="sh-meta"><span id="shTheme" class="theme"></span><span id="shDist" class="dist"></span></div>
+      <h2 id="shTitle"></h2>
+      <dl class="facts" id="shFacts"></dl>
+      <div class="row" id="shActions"></div>
+      <div id="shBody" class="body"></div>
+    </div>
+  </div>
+</div>
+
+<script src="icones.js"></script>
+<script src="desti.js"></script>
+</body>
+</html>

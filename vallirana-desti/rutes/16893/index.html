@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Natura Local · Camí al mas de les Fonts</title>
+<meta name="description" content="Itinerari circular amb &lt;strong&gt;desnivells considerables&lt;/strong&gt; tant de pujada com de baixada. Veurem una important zona extractiva de &lt;strong&gt;pedra calcària&lt;/strong&gt;. Passarem per &lt;strong&gt;garrigues&lt;">
+<meta name="robots" content="noindex">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Camí al mas de les Fonts">
+<meta property="og:description" content="Itinerari circular amb &lt;strong&gt;desnivells considerables&lt;/strong&gt; tant de pujada com de baixada. Veurem una important zona extractiva de &lt;strong&gt;pedra calcària&lt;/strong&gt;. Passarem per &lt;strong&gt;garrigues&lt;">
+<meta property="og:image" content="https://toribioyun.github.io/naturalocal-webapp-proves/vallirana-desti/rutes/16893/media/n16893_1.jpg">
+<meta name="theme-color" content="#322820">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Natura Local">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="fulla.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- Home: route card, how to do it (online / downloaded), list of points -->
+<main id="home" class="screen">
+  <header class="appbar">
+    <a id="backLink" class="backlink" hidden></a>
+    <img src="logo.svg" alt="Natura Local" class="logo">
+    <span class="proto" id="protoTag">Prototip</span>
+    <span id="net" class="net" aria-live="polite"></span>
+  </header>
+  <div class="hero">
+    <img id="heroImg" alt="" src="media/n16893_1.jpg">
+    <div class="hero-txt">
+      <span class="kind"><img src="fulla.svg" alt=""> Ruta</span>
+      <h1 id="rTitle">Camí al mas de les Fonts</h1>
+    </div>
+  </div>
+  <section class="pad">
+    <dl class="facts" id="rStats"><div><dt>Distància</dt><dd>10,60 km</dd></div><div><dt>Durada</dt><dd>2 hores 40 minuts</dd></div><div><dt>Desnivell</dt><dd>348 m</dd></div><div><dt>Dificultat</dt><dd>Mitjana</dd></div><div><dt>Tipologia</dt><dd>Circular antihorari</dd></div><div class="wide"><dt>Temàtica</dt><dd>Flora i fauna, Geologia, Paisatgístic</dd></div></dl>
+    <a id="fitxaLink" class="fitxa-link" target="_blank" rel="noopener" href="https://naturalocal.net/ca/rutes-senderisme-catalunya/rutes-senderisme-barcelona/rutes-senderisme-vallirana/cami-al-mas-de-les-fonts">Veure la fitxa a Natura Local ↗</a>
+
+    <button id="startBtn" class="big primary">Comença la ruta</button>
+    <button id="demoBtn" class="big demo">▶ Prova-la des de casa</button>
+    <p class="cta-note">«Prova-la des de casa» camina sola pel recorregut: veuràs com es mou el mapa i els avisos en arribar a cada punt.</p>
+    <p class="cta-note">Amb cobertura no cal descarregar res (gasta <span class="mbOnline">uns 8 MB</span> de dades). Si la perds a mig camí, el mapa, el GPS i els avisos continuen funcionant.</p>
+
+    <div class="box" id="offBox">
+      <div class="box-head">
+        <strong>Vas a un lloc sense cobertura?</strong>
+        <span id="offState" class="pill info">Comprovant…</span>
+      </div>
+      <p class="muted">Descarrega-la ara, amb connexió, i la podràs fer tota en mode avió: mapa, ortofoto, fotos, àudios i vídeos.</p>
+      <p id="offText" hidden></p>
+      <div class="bar"><i id="offBar"></i></div>
+      <div class="row">
+        <button id="dlBtn">Descarrega la ruta</button>
+        <button id="installBtn" hidden>Instal·la l'app</button>
+      </div>
+      <p id="iosHint" class="hint" hidden>A l'iPhone: botó <b>Compartir</b> → <b>Afegeix a la pantalla d'inici</b>. Obre-la sempre des de la icona; si no, l'iPhone pot esborrar la descàrrega.</p>
+    </div>
+
+    <h2 class="sec">Què hi ha?</h2>
+    <ol class="poilist" id="poiList"></ol>
+
+    <details class="diag">
+      <summary>Informe per a proves</summary>
+      <p class="muted">Si alguna cosa no va, prem «Copia l'informe» i enganxa'l al xat.</p>
+      <pre id="diagLog"></pre>
+      <div class="row"><button id="copyDiag">Copia l'informe</button><button id="resetBtn">Esborra la descàrrega</button></div>
+    </details>
+    <p class="foot">Mapa: © col·laboradors d'OpenStreetMap (ODbL). Ortofoto: © Institut Cartogràfic i Geològic de Catalunya (CC BY 4.0). Continguts: Natura Local.</p>
+  </section>
+</main>
+
+<!-- Navigation: full-screen map -->
+<section id="nav" class="screen" hidden>
+  <div class="mapwrap">
+    <canvas id="map" aria-label="Mapa de la ruta"></canvas>
+    <div class="maptop">
+      <button id="backBtn" class="backpill">‹ Fitxa de la ruta</button>
+      <span id="net2" class="net"></span>
+      <button id="fullBtn" class="round" aria-pressed="false" aria-label="Pantalla completa" title="Pantalla completa">⤢</button>
+    </div>
+    <div class="mapbtns">
+      <button id="layerBtn" class="layer" aria-pressed="false" title="Canvia entre mapa i ortofoto">Orto</button>
+      <button id="zin" aria-label="Apropa">+</button>
+      <button id="zout" aria-label="Allunya">−</button>
+      <button id="rotBtn" aria-pressed="false" title="Mapa orientat cap on mires">N</button>
+      <button id="meBtn" aria-pressed="true" title="Segueix la meva posició">◎</button>
+    </div>
+    <div id="offroute" class="offroute" hidden>Fora de la ruta</div>
+    <div id="toast" class="toast" hidden></div>
+    <button id="miniBar" class="minibar" hidden aria-label="Mostra el panell de la ruta">
+      <span class="badge" id="mBadge">1</span>
+      <span class="mtxt"><strong id="mName"></strong><small id="mDist"></small></span>
+      <span class="mopen">⌃</span>
+    </button>
+    <div id="attr" class="attr">© OpenStreetMap</div>
+  </div>
+  <div class="card" id="navCard">
+    <div class="bar"><i id="progBar"></i></div>
+    <div class="stats">
+      <div class="stat done"><span>Fet</span><b id="sDone">0 m</b></div>
+      <div class="stat"><span>Falta</span><b id="sLeft">–</b></div>
+      <div class="stat done ele"><span>↗ Pujat</span><b id="sUp">–</b></div>
+      <div class="stat ele"><span>↗ Per pujar</span><b id="sUpLeft">–</b></div>
+      <div class="stat"><span>Tresors</span><b id="sTre">0/0</b></div>
+    </div>
+    <button class="next" id="nextBtn"><span class="badge" id="nBadge">1</span><span><small id="nDist">Següent punt</small><strong id="nName"></strong></span><span class="chev">›</span></button>
+    <details id="profBox" class="prof">
+      <summary><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M2 20 9 7l4 6 3-4 6 11z" fill="currentColor"/></svg><span class="pt">Gràfica de desnivell</span><span id="profSum" class="muted"></span><svg class="chev" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+      <div class="profmode" id="profMode" role="group" aria-label="Què mostra la gràfica"><button data-m="tram" aria-pressed="true">Propers 2 km</button><button data-m="tot" aria-pressed="false">Tota la ruta</button></div>
+      <canvas id="prof" aria-label="Perfil de desnivell de la ruta"></canvas>
+    </details>
+    <div class="row">
+      <button id="gpsBtn" class="primary grow">Activa el GPS</button>
+      <button id="voiceBtn" aria-pressed="true">Veu: sí</button>
+      <button id="simBtn">Simula</button>
+      <button id="speedBtn" hidden title="Velocitat de la simulació">×4</button>
+    </div>
+    <p id="gpsNote" class="note"></p>
+  </div>
+</section>
+
+<!-- Point sheet -->
+<div id="sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="shTitle">
+  <div class="sheet-in">
+    <button id="shClose" class="round close" aria-label="Tanca">×</button>
+    <div class="gal-wrap">
+      <div class="gallery" id="shGal"></div>
+      <span id="shDots" class="gdots" hidden></span>
+    </div>
+    <div class="pad">
+      <div class="sh-meta"><span id="shTheme" class="theme"></span><span id="shDist" class="dist"></span></div>
+      <div id="shCountM" class="mcount"></div>
+      <h2 id="shTitle"></h2>
+      <p id="shMiss" class="miss" hidden></p>
+      <div id="shAudioBox" class="media" hidden><span class="mlabel">Escolta</span><audio id="shAudio" controls preload="none"></audio></div>
+      <video id="shVideo" controls playsinline preload="none" hidden></video>
+      <div class="row" id="shActions"></div>
+      <div id="shBody" class="body"></div>
+      <a id="shFitxa" class="fitxa-link" target="_blank" rel="noopener" hidden>Veure la fitxa a Natura Local ↗</a>
+    </div>
+    <div class="sh-nav">
+      <button id="shPrev">‹ Anterior</button>
+      <button id="shNext">Següent ›</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
