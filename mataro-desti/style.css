@@ -174,7 +174,7 @@ video{width:100%;border-radius:14px;background:#000;margin:0 0 10px;display:bloc
 .tabs button[aria-selected="true"]{color:var(--gold);border-bottom-color:var(--gold)}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--line);scrollbar-width:none;flex:none}
 .chips::-webkit-scrollbar{display:none}
-.chips button{flex:none;min-height:36px;padding:6px 12px;font-size:.85rem;font-weight:700}
+.chips button{flex:none;min-height:44px;padding:6px 12px;font-size:.85rem;font-weight:700}
 .chips button[aria-pressed="true"]{background:var(--brown);border-color:var(--brown);color:var(--gold)}
 .chips small{font-weight:600;opacity:.75;margin-left:3px}
 .view{flex:1 1 auto;position:relative;min-height:0}

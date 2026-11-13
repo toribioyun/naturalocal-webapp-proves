@@ -205,8 +205,12 @@ $('dlBtn').onclick = async () => {
     let n = 0, bytes = 0;
     for (const f of files) {
       if (!(await c.match(f))) {
-        const res = await fetch(f, {cache: 'reload'});
-        if (!res.ok) throw new Error(f + ' → ' + res.status);
+        let res = null;
+        for (let k = 0; k < 3; k++) { // up to 3 tries per file: a busy server answers 503 now and then
+          try { res = await fetch(f, {cache: 'reload'}); if (res.ok) break; } catch (e) { res = null; }
+          await new Promise(r => setTimeout(r, 1500 * (k + 1)));
+        }
+        if (!res || !res.ok) throw new Error(f + ' → ' + (res ? res.status : 'sense resposta'));
         const blob = await res.blob(); bytes += blob.size;
         await c.put(f, new Response(blob, {headers: {'Content-Type': res.headers.get('Content-Type') || blob.type}}));
       }
@@ -617,13 +621,20 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
   showClimb();
   // proximity to points
   let nextI = -1, nd = Infinity;
+  const hits = []; // [order, distance, index, kind]: treasures first, then the nearest
   POIS.forEach((p, i) => {
     const d = dist([x, y], [p.x, p.y]);
-    if (isInfo(p)) { if (isClose(p, d, s) && !notified.has(p.id)) { notified.add(p.id); arriveInfo(i); } return; }
-    if (isTreasure(p) && d <= TREASURE_M && !found.has(p.id)) { found.add(p.id); arrive(i, true); }
-    else if (!isTreasure(p) && isClose(p, d, s) && !notified.has(p.id)) { notified.add(p.id); visited.add(p.id); arrive(i, false); }
+    if (isInfo(p)) { if (isClose(p, d, s) && !notified.has(p.id)) { notified.add(p.id); hits.push([2, d, i, 'info']); } return; }
+    if (isTreasure(p) && d <= TREASURE_M && !found.has(p.id)) { found.add(p.id); hits.push([0, d, i, 'tre']); }
+    else if (!isTreasure(p) && isClose(p, d, s) && !notified.has(p.id)) { notified.add(p.id); visited.add(p.id); hits.push([1, d, i, 'poi']); }
     if (!visited.has(p.id) && !found.has(p.id) && d < nd) { nd = d; nextI = i; }
   });
+  if (hits.length) {
+    hits.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const [, , i, k] = hits[0], more = hits.filter(h => h[3] !== 'info').length - (k === 'info' ? 0 : 1);
+    if (k === 'info') arriveInfo(i); else arrive(i, k === 'tre', more);
+    hits.slice(1).forEach(h => log((h[3] === 'tre' ? 'Tresor: ' : h[3] === 'info' ? 'Indicació: ' : 'Arribada: ') + POIS[h[2]].name + ' (alhora)'));
+  }
   updateNext(nextI, nd); updateTreasures(); drawProfile();
   if (follow) centreOn(x, y); else draw();
   if (src === 'gps') $('gpsNote').textContent = `GPS: precisió ±${Math.round(acc)} m · a ${Math.round(s.off)} m del track`;
@@ -658,11 +669,11 @@ function showClimb() {
   $('sUp').textContent = Math.round(done) + ' m'; $('sUpLeft').textContent = Math.round(all - done) + ' m';
 }
 function updateTreasures() { const n = POIS.filter(isTreasure).length; $('sTre').textContent = `${found.size}/${n}`; $('sTre').parentElement.hidden = !n; }
-function arrive(i, treasure) {
+function arrive(i, treasure, more = 0) {
   const p = POIS[i], far = !treasure && p.off > NEAR_M; // far: seen from the track, not reached
   if (navigator.vibrate) navigator.vibrate(treasure ? [200, 100, 200, 100, 400] : [250, 120, 250]);
   const t = $('toast'); popIdx = -1; t.className = 'toast';
-  t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : far ? `A ${fmtM(dist([me.x, me.y], [p.x, p.y]))} de tu` : 'Has arribat'}</span><h3>${treasure ? '★ ' : p.num + '. '}${esc(p.name)}</h3><div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
+  t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : far ? `A ${fmtM(dist([me.x, me.y], [p.x, p.y]))} de tu` : 'Has arribat'}</span><h3>${treasure ? '★ ' : p.num + '. '}${esc(p.name)}</h3>${more ? `<p class="muted">I ${more} punt${more > 1 ? 's' : ''} més a prop: els tens a la llista.</p>` : ''}<div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
   t.hidden = false;
   $('tOpen').onclick = () => { t.hidden = true; openSheet(i); };
   $('tClose').onclick = () => { t.hidden = true; };
@@ -760,7 +771,7 @@ addEventListener('popstate', () => { closeSheet(); show(false); });
   POIS = D.pois.map(p => { const [x, y] = toXY(p.lat, p.lon); return {...p, x, y, along: 0}; });
   POIS.forEach(p => { const s = snap([p.x, p.y]); p.along = s.along; p.off = s.off; });
   POIS.sort((a, b) => a.along - b.along);
-  let num = 0; POIS.forEach(p => { if (!isInfo(p)) p.num = ++num; }); // numbered in walking order, information points apart
+  let num = 0; POIS.forEach(p => { if (!isInfo(p) && !isTreasure(p)) p.num = ++num; }); // numbered in walking order; information points and treasures apart
   buildLayers(); renderHome(); updateTreasures(); updateNext(0, NaN);
   buildClimb();
   $('profBox').hidden = !ELE.length; $('profSum').textContent = profSummary(); $('profMode').hidden = TOTAL <= TRAM_M * 1.5;
