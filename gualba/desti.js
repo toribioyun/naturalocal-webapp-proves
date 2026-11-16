@@ -163,19 +163,19 @@ function openSheet(i) {
   $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}`;
   $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [it.x, it.y])) + ' de tu' : '';
   $('shTitle').textContent = it.n;
-  const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada', it.dur], ['Desnivell', it.des], ['Dificultat', it.dif], ['Tipologia', it.tip], ['Temàtica', it.tema]].filter(f => f[1]) : [];
+  const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada a peu', it.dur], ['Desnivell', it.des], ['Dificultat', it.dif], ['Tipologia', it.tip], ['Temàtica', it.tema]].filter(f => f[1]) : [];
   $('shFacts').innerHTML = facts.map(([k, v]) => `<div${k === 'Temàtica' ? ' class="wide"' : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   const acts = [];
   // routes with their own route app (points of interest, download): link to it; otherwise, the simple navigation here
-  if (it.app) acts.push(`<a class="btn primary grow" href="${it.app}">Navega la ruta</a><p class="appnote">${it.pts} punts d'interès. Des d'allà també la pots descarregar per anar sense cobertura.</p>`);
+  if (it.app) acts.push(`<a class="btn primary grow" href="${it.app}">Navega la ruta</a>`,
+    `<a class="btn grow dl" href="${it.app}#descarrega">⬇ Descarrega-la per anar sense cobertura${it.mb ? ` (uns ${it.mb} MB)` : ''}</a><p class="appnote">${it.pts} punts d'interès.</p>`);
   else if (it.g === 'ruta') acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
   if (it.tel) acts.push(`<a class="btn" href="tel:${esc(it.tel)}">📞 Truca</a>`);
   acts.push(`<button id="aMap">Veure al mapa</button>`);
   if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Veure la fitxa a Natura Local ↗</a>`);
   $('shActions').innerHTML = acts.join('');
   if ($('aNav')) $('aNav').onclick = () => { closeSheet(); startNav(it); };
-  const appLink = $('shActions').querySelector('a.primary');
-  if (appLink) appLink.onclick = rememberView;
+  $('shActions').querySelectorAll('a[href^="rutes/"]').forEach(a => { a.onclick = rememberView; });
   $('aMap').onclick = () => { closeSheet(); showOnMap(it); };
   $('shBody').innerHTML = it.g === 'ruta' ? routeText(it) : (it.desc || []).map(p => `<p>${p}</p>`).join('');
   $('sheet').hidden = false; $('sheet').querySelector('.sheet-in').scrollTop = 0;

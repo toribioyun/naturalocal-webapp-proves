@@ -154,7 +154,7 @@ function renderHome() {
   const r = D.route;
   $('rTitle').textContent = r.name;
   $('heroImg').src = 'media/' + r.imgs[0];
-  const facts = [['Distància', r.distancia.replace('.00', '').replace('.', ',')], ['Durada', r.durada],
+  const facts = [['Distància', r.distancia.replace('.00', '').replace('.', ',')], ['Durada a peu', r.durada],
     ['Desnivell', r.desnivell.replace('.00', '').replace(' meters', ' m')], ['Dificultat', r.dificultat],
     ['Tipologia', r.tipus], ['Temàtica', r.tema]].filter(f => f[1]);
   $('rStats').innerHTML = facts.map(([k, v]) => `<div${k === 'Temàtica' ? ' class="wide"' : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
@@ -188,13 +188,20 @@ async function checkOffline() {
   if (have === files.length) {
     setOff(true, 'Tot guardat al mòbil: ja pots posar el mode avió.');
     $('dlBtn').textContent = 'Torna a descarregar';
+    setBig('✓ Descarregada: la pots fer sense cobertura', true);
   } else if (!navigator.onLine) {
     setOff(false, `Ara no tens connexió. Pots fer la ruta igualment, però sense les fotos, els àudios, els vídeos i l'ortofoto que no tens guardats.`);
   } else {
     setOff(false, have ? `Ja tens guardada una part (${Math.round(100 * have / files.length)} %): el que has obert.` : '');
     $('dlBtn').textContent = $('dlBtn').dataset.label || 'Descarrega la ruta';
   }
+  if (have < files.length) setBig('⬇ ' + ($('dlBtn').dataset.label || 'Descarrega la ruta').replace('Descarrega la ruta', 'Descarrega-la per anar sense cobertura'));
 }
+function setBig(txt, done) { const b = $('dlBig'); b.textContent = txt; b.classList.toggle('done', !!done); }
+$('dlBig').onclick = () => {
+  $('offBox').scrollIntoView({behavior: 'smooth', block: 'center'});
+  if (!$('dlBtn').disabled && !$('dlBig').classList.contains('done')) $('dlBtn').click();
+};
 function setOff(ok, txt) {
   const s = $('offState'); s.textContent = ok ? 'Descarregada ✓' : 'No descarregada'; s.classList.toggle('ok', ok); s.classList.toggle('info', !ok);
   $('offText').textContent = txt; $('offText').hidden = !txt;
@@ -217,7 +224,7 @@ $('dlBtn').onclick = async () => {
         const blob = await res.blob(); bytes += blob.size;
         await c.put(f, new Response(blob, {headers: {'Content-Type': res.headers.get('Content-Type') || blob.type}}));
       }
-      n++; $('offBar').style.width = (100 * n / files.length) + '%';
+      n++; $('offBar').style.width = (100 * n / files.length) + '%'; setBig(`Descarregant… ${Math.round(100 * n / files.length)} %`);
     }
     log(`Descàrrega completa: ${n} fitxers, ${(bytes / 1e6).toFixed(1)} MB nous`);
   } catch (err) { log('Error en descarregar: ' + err.message); alertMsg('No s\'ha pogut descarregar tot. Torna-ho a provar amb bona connexió.'); }
@@ -257,8 +264,13 @@ function openSheet(i) {
     a.removeAttribute('href'); a.insertAdjacentHTML('afterend', '<small class="muted linknote">Aquest enllaç necessita connexió.</small>');
   });
   const text = $('shBody').innerText.trim();
+  stopReading();
   $('shActions').innerHTML = text && 'speechSynthesis' in window ? '<button id="ttsBtn">🔊 Llegeix en veu alta</button>' : '';
-  if ($('ttsBtn')) $('ttsBtn').onclick = () => speak(p.name + '. ' + text, true);
+  if ($('ttsBtn')) $('ttsBtn').onclick = () => { // the same button stops it (Juanjo: «un cop comencen no els pots parar»)
+    const b = $('ttsBtn'); if (b.dataset.on) { stopReading(); return; }
+    hush(); b.dataset.on = '1'; b.textContent = '⏹ Atura la lectura'; reading = true;
+    speak(p.name + '. ' + text, true, () => { reading = false; if (b.dataset.on) { delete b.dataset.on; b.textContent = '🔊 Llegeix en veu alta'; } pumpNotices(); });
+  };
   $('shPrev').disabled = isInfo(p) || stepIdx(i, -1) < 0; $('shNext').disabled = isInfo(p) || stepIdx(i, 1) < 0;
   $('shFitxa').hidden = !p.url || isInfo(p); if (p.url) $('shFitxa').href = p.url; // information points have no page of their own to show
   $('sheet').hidden = false; $('sheet').querySelector('.sheet-in').scrollTop = 0;
@@ -286,17 +298,60 @@ async function checkMissing(p) {
 $('shAudio').onerror = () => { if (sheetIdx >= 0 && POIS[sheetIdx].audio.length) { $('shAudioBox').hidden = true; noteMissing('àudio'); } };
 $('shVideo').onerror = () => { if (sheetIdx >= 0 && POIS[sheetIdx].video.length) { $('shVideo').hidden = true; noteMissing('vídeo'); } };
 function stopMedia() { $('shAudio').pause(); $('shVideo').pause(); try { speechSynthesis.cancel(); } catch (e) {} }
-function closeSheet() { $('sheet').hidden = true; stopMedia(); }
+function stopReading() {
+  const b = $('ttsBtn');
+  if (b && b.dataset.on) { delete b.dataset.on; b.textContent = '🔊 Llegeix en veu alta'; try { speechSynthesis.cancel(); } catch (e) {} }
+  reading = false;
+}
+function closeSheet() { $('sheet').hidden = true; stopMedia(); stopReading(); }
 $('shClose').onclick = closeSheet;
 $('sheet').onclick = e => { if (e.target === $('sheet')) closeSheet(); };
 
 /* ---------- voice ---------- */
 let voiceOn = true, caVoice = null;
-function loadVoices() { try { caVoice = speechSynthesis.getVoices().find(v => /^ca/i.test(v.lang)) || null; } catch (e) {} }
+function loadVoices() { try { caVoice = speechSynthesis.getVoices().find(v => /^ca/i.test(v.lang)) || null; if (caVoice && !loadVoices.said) { loadVoices.said = 1; log('Veu: ' + caVoice.name); } } catch (e) {} }
 if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
-function speak(t, force) {
+// Words in capitals (PERILL CARRETERA, TEST) are spelt letter by letter by the voices: they are read in small letters.
+// Short ones (GR, PR, BTT, GPS) and Roman numerals (XIX) stay as they are: those are read letter by letter on purpose.
+const sayable = t => String(t).replace(/[\p{L}·'’]+/gu, w => w.length > 3 && !/^[IVXLCDM]+$/.test(w) && w === w.toUpperCase() && w !== w.toLowerCase() ? w.toLowerCase() : w)
+  .replace(/(\d)\s*º/g, '$1 graus').replace(/([!?¡¿])\1+/g, '$1').replace(/\s+/g, ' ').trim();
+// Notices wait their turn (two points close together no longer cut each other: Juanjo, 16/11/2026); a read-out asked for
+// by the person (force) replaces whatever was being said.
+function speak(t, force, onend) {
   if ((!voiceOn && !force) || !('speechSynthesis' in window)) return;
-  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ca-ES'; if (caVoice) u.voice = caVoice; u.rate = .95; speechSynthesis.speak(u); } catch (e) {}
+  try {
+    if (force) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(sayable(t)); u.lang = 'ca-ES'; if (caVoice) u.voice = caVoice; u.rate = .95;
+    if (onend) u.onend = u.onerror = onend;
+    speechSynthesis.speak(u);
+  } catch (e) { if (onend) onend(); }
+}
+// Spoken notices go through a queue of their own: they no longer cut each other when points are close together (Juanjo,
+// 16/11/2026), the off-route one goes first and cuts whatever is being said, notices older than 12 s or no longer true are
+// dropped, and while a sheet is being read aloud the notices wait (the bell and the card still appear at once).
+const notices = []; let noticeOn = false, reading = false, noticeGuard = null;
+function notice(text, {prio = false, valid = () => true} = {}) {
+  if (!voiceOn || !('speechSynthesis' in window)) return;
+  if (prio) { notices.length = 0; stopReading(); try { speechSynthesis.cancel(); } catch (e) {} noticeOn = false; }
+  notices.push({text, t: Date.now(), valid});
+  if (notices.length > 2) notices.splice(0, notices.length - 2); // two at most: the newest
+  pumpNotices();
+}
+function pumpNotices() {
+  if (noticeOn || reading) return;
+  while (notices.length) {
+    const n = notices.shift();
+    if (Date.now() - n.t > 12000 || !n.valid()) continue;
+    noticeOn = true;
+    const done = () => { if (!noticeOn) return; noticeOn = false; clearTimeout(noticeGuard); pumpNotices(); };
+    clearTimeout(noticeGuard); noticeGuard = setTimeout(done, 2500 + n.text.length * 110); // Android sometimes never says «ended»
+    speak(n.text, true, done);
+    return;
+  }
+}
+function hush() { // «Veu: no», «Continua», leaving the navigation
+  notices.length = 0; clearTimeout(offRepeat);
+  if (noticeOn) { noticeOn = false; try { speechSynthesis.cancel(); } catch (e) {} }
 }
 /* ---------- sound and vibration of the notices (Toribio, 15/11/2026: they can be switched off) ---------- */
 // Android: navigator.vibrate. iPhone: Safari has no vibration for web pages (W3C implementation report), and the hidden
@@ -332,6 +387,22 @@ function beep(n = 2) {
     }
   } catch (e) { log('So: ' + e.message); }
 }
+function chime() { // two strikes of a small bell
+  if (!alertsOn || !actx) return false;
+  try {
+    if (navigator.audioSession) { navigator.audioSession.type = 'playback'; clearTimeout(sessionTimer); sessionTimer = setTimeout(() => { try { navigator.audioSession.type = 'auto'; } catch (e) {} }, 2200); }
+    if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime + 0.05;
+    for (const [at, f] of [[0, 1318.5], [0, 1975.5], [0.28, 1318.5], [0.28, 1975.5]]) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + at); g.gain.exponentialRampToValueAtTime(f > 1500 ? 0.25 : 0.5, t + at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + at + 1.1);
+      o.connect(g); g.connect(actx.destination); o.start(t + at); o.stop(t + at + 1.15);
+    }
+    return true;
+  } catch (e) { return false; }
+}
+const afterChime = (fn, ms = 900) => chime() ? setTimeout(fn, ms) : fn();
 function buzz(pattern) {
   if (!alertsOn) return;
   if (navigator.vibrate) { navigator.vibrate(pattern); return; }
@@ -354,7 +425,7 @@ function setAlerts(on) {
 }
 $('alertBtn').onclick = () => setAlerts(!alertsOn);
 $('alertBtn').textContent = alertName() + ': ' + (alertsOn ? 'sí' : 'no'); $('alertBtn').setAttribute('aria-pressed', alertsOn);
-$('voiceBtn').onclick = () => { voiceOn = !voiceOn; $('voiceBtn').textContent = 'Veu: ' + (voiceOn ? 'sí' : 'no'); $('voiceBtn').setAttribute('aria-pressed', voiceOn); };
+$('voiceBtn').onclick = () => { voiceOn = !voiceOn; if (!voiceOn) hush(); $('voiceBtn').textContent = 'Veu: ' + (voiceOn ? 'sí' : 'no'); $('voiceBtn').setAttribute('aria-pressed', voiceOn); };
 
 /* ---------- map ---------- */
 const cv = $('map'), ctx = cv.getContext('2d');
@@ -705,7 +776,7 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
 // A point set back from the track would never be reached: it fires when passing the closest spot of the route.
 const isClose = (p, d, s) => d <= NEAR_M || (p.off > NEAR_M && s.off <= TRACK_M && Math.abs(s.along - p.along) <= NEAR_M);
 // Off the route only after several readings in a row (one bad GPS reading is not enough), and said once until back on it.
-let offCount = 0, offWarned = false;
+let offCount = 0, offWarned = false, offRepeat = null;
 function checkOffRoute(off, acc = 5) {
   if (!started) return; // walking to the start (station, car park) is not being off the route
   if (off > OFFROUTE_M && acc > OFFROUTE_M) return; // a reading that imprecise (trees, buildings) neither counts nor resets
@@ -715,7 +786,9 @@ function checkOffRoute(off, acc = 5) {
   if (offCount >= OFF_READINGS && !offWarned) {
     offWarned = true;
     buzz([400, 150, 400, 150, 400]); beep(2);
-    speak('Atenció, estàs fora de la ruta.');
+    notice('Atenció, estàs fora de la ruta.', {prio: true, valid: () => offWarned});
+    clearTimeout(offRepeat);
+    offRepeat = setTimeout(() => { if (offWarned) { buzz([400, 150, 400]); beep(2); notice('Atenció, estàs fora de la ruta.', {prio: true, valid: () => offWarned}); log('Fora de la ruta: avís repetit'); } }, 5000);
     view.s = Math.min(view.s, Math.min(W, H) * 0.35 / Math.max(off, 1)); // zoom out: you and the route in sight
     draw(); // with coverage, the whole map (see paint)
     log('Fora de la ruta: a ' + Math.round(off) + ' m del track');
@@ -746,8 +819,8 @@ function arrive(i, treasure, more = 0) {
   t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : far ? `A ${fmtM(dist([me.x, me.y], [p.x, p.y]))} de tu` : 'Has arribat'}</span><h3>${treasure ? '★ ' : p.num + '. '}${esc(p.name)}</h3>${more ? `<p class="muted">I ${more} punt${more > 1 ? 's' : ''} més a prop: els tens a la llista.</p>` : ''}<div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
   t.hidden = false;
   $('tOpen').onclick = () => { t.hidden = true; openSheet(i); };
-  $('tClose').onclick = () => { t.hidden = true; };
-  speak(treasure ? `Enhorabona! Has trobat el ${p.name}.` : far ? `Tens a prop: ${p.name}.` : `Has arribat a ${p.name}.`);
+  $('tClose').onclick = () => { t.hidden = true; hush(); };
+  afterChime(() => notice(treasure ? `Enhorabona! Has trobat el ${p.name}.` : far ? `Tens a prop: ${p.name}.` : `Has arribat a ${p.name}.`));
   log((treasure ? 'Tresor: ' : 'Arribada: ') + p.name);
 }
 // A direction or warning: short notice, it does not count as a visited point.
@@ -755,7 +828,7 @@ function arriveInfo(i) {
   const p = POIS[i];
   buzz(150);
   showPop(i);
-  speak(p.name.toLowerCase());
+  afterChime(() => notice(p.name));
   log('Indicació: ' + p.name);
 }
 let wake = null;
@@ -825,7 +898,7 @@ async function startCompass() {
 /* ---------- screens ---------- */
 function show(nav) {
   $('home').hidden = nav; $('nav').hidden = !nav;
-  if (nav) { resize(); if (!me) fitRoute(); drawProfile(); } else { if ($('nav').classList.contains('full')) setFull(false); checkOffline(); }
+  if (nav) { resize(); if (!me) fitRoute(); drawProfile(); } else { if ($('nav').classList.contains('full')) setFull(false); stopSim(); hush(); checkOffline(); }
 }
 $('startBtn').onclick = () => { unlockAudio(); show(true); history.pushState({nav: 1}, ''); };
 $('backBtn').onclick = () => history.back();
@@ -848,5 +921,9 @@ addEventListener('popstate', () => { closeSheet(); show(false); });
   $('profBox').hidden = !ELE.length; $('profSum').textContent = profSummary(); $('profMode').hidden = TOTAL <= TRAM_M * 1.5;
   document.querySelectorAll('.stat.ele').forEach(t => t.hidden = !ELE.length); showClimb();
   log(`Ruta: ${fmtM(TOTAL)}, ${POIS.filter(p => !isInfo(p)).length} punts d'interès, ${POIS.filter(isInfo).length} d'informació, ${orthoList().length} tessel·les d'ortofoto per descarregar`);
-  checkOffline();
+  const checked = checkOffline();
+  if (location.hash === '#descarrega') { // «Descarrega-la» from the destination's sheet
+    history.replaceState(null, '', location.pathname + location.search);
+    checked.then(() => setTimeout(() => $('dlBig').click(), 300));
+  }
 })();
