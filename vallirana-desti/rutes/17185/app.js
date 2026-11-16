@@ -155,7 +155,7 @@ function renderHome() {
   $('rTitle').textContent = r.name;
   $('heroImg').src = 'media/' + r.imgs[0];
   const facts = [['Distància', r.distancia.replace('.00', '').replace('.', ',')], ['Durada a peu', r.durada],
-    ['Desnivell', r.desnivell.replace('.00', '').replace(' meters', ' m')], ['Dificultat', r.dificultat],
+    ['Desnivell', r.desnivell.replace('.00', '').replace(' meters', ' m')], ['Durada en bici', r.duradaBici], ['Dificultat', r.dificultat], ['Dificultat en bici', r.dificultatBici !== r.dificultat && r.dificultatBici],
     ['Tipologia', r.tipus], ['Temàtica', r.tema]].filter(f => f[1]);
   $('rStats').innerHTML = facts.map(([k, v]) => `<div${k === 'Temàtica' ? ' class="wide"' : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   $('poiList').innerHTML = POIS.map((p, i) => {

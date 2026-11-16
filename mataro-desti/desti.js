@@ -163,7 +163,7 @@ function openSheet(i) {
   $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}`;
   $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [it.x, it.y])) + ' de tu' : '';
   $('shTitle').textContent = it.n;
-  const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada a peu', it.dur], ['Desnivell', it.des], ['Dificultat', it.dif], ['Tipologia', it.tip], ['Temàtica', it.tema]].filter(f => f[1]) : [];
+  const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada a peu', it.dur], ['Durada en bici', it.durBici], ['Desnivell', it.des], ['Dificultat', it.dif], ['Dificultat en bici', it.difBici !== it.dif && it.difBici], ['Tipologia', it.tip], ['Temàtica', it.tema]].filter(f => f[1]) : [];
   $('shFacts').innerHTML = facts.map(([k, v]) => `<div${k === 'Temàtica' ? ' class="wide"' : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   const acts = [];
   // routes with their own route app (points of interest, download): link to it; otherwise, the simple navigation here
