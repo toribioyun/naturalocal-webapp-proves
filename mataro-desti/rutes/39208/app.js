@@ -10,6 +10,9 @@ const TRACK_M = 40; // progress keeps counting up to here: a GPS jump must not s
 // Free orthophoto of the ICGC (CC BY 4.0). Zooms 14–17 go in the download; 18–19 only online.
 const ORTO_URL = (z, x, y) => `https://geoserveis.icgc.cat/icc_mapesmultibase/noutm/wmts/orto/GRID3857/${z}/${x}/${y}.jpeg`;
 const ORTO_DL_Z = [14, 15, 16, 17], ORTO_MAX_Z = 19, ORTO_KB = 30;
+// Off the route with coverage: the whole map, ICGC topographic (online only; Toribio, 15/11/2026). Without coverage, the route's own map.
+const TOPO_URL = (z, x, y) => `https://geoserveis.icgc.cat/icc_mapesmultibase/noutm/wmts/topo/GRID3857/${z}/${x}/${y}.jpeg`, TOPO_MAX_Z = 17;
+const fullMap = () => !ortho && navigator.onLine && offWarned;
 let D = null, BASE = null;
 
 /* ---------- diagnostics log ---------- */
@@ -32,7 +35,7 @@ function updateNet() {
   }
 }
 addEventListener('online', () => { updateNet(); log('Connexió: sí'); tiles.clear(); draw(); if (D) checkOffline(); });
-addEventListener('offline', () => { updateNet(); log('Connexió: no'); if (D) checkOffline(); });
+addEventListener('offline', () => { updateNet(); log('Connexió: no'); draw(); if (D) checkOffline(); });
 // Images that can't load (offline and not saved) are hidden instead of showing a broken icon.
 document.addEventListener('error', e => {
   if (e.target.tagName !== 'IMG') return;
@@ -295,6 +298,62 @@ function speak(t, force) {
   if ((!voiceOn && !force) || !('speechSynthesis' in window)) return;
   try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ca-ES'; if (caVoice) u.voice = caVoice; u.rate = .95; speechSynthesis.speak(u); } catch (e) {}
 }
+/* ---------- sound and vibration of the notices (Toribio, 15/11/2026: they can be switched off) ---------- */
+// Android: navigator.vibrate. iPhone: Safari has no vibration for web pages (W3C implementation report), and the hidden
+// «switch» checkbox trick only gives a tap after a touch of the person (WebKit bug 285120, fixed 3/1/2025): a notice that
+// comes from the GPS does not vibrate on an iPhone. The tap is still tried; the button says «So» there, not «vibració».
+// Sound: a double beep with Web Audio. iPhone only plays it if the audio was unlocked by a tap (start, simulate, GPS),
+// and the silent switch mutes it unless the audio session is «playback» (Safari 17+), set only while beeping.
+// «playback» may stop music playing in another app (Spotify…); «transient» would not, but the silent switch mutes it (WebKit 264473).
+let alertsOn = true;
+try { alertsOn = localStorage.getItem('nl-avisos') !== 'no'; } catch (e) {}
+let actx = null, hapticEl = null, sessionTimer = null, audioLogged = false;
+const alertName = () => navigator.vibrate ? 'So i vibració' : 'So';
+function unlockAudio() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const s = actx.createBufferSource(); s.buffer = actx.createBuffer(1, 1, 22050); s.connect(actx.destination); s.start(0);
+  } catch (e) { if (!audioLogged) { audioLogged = true; log('Àudio no disponible: ' + e.message); } }
+}
+// back from the background or a locked screen, iPhone may leave the audio «interrupted»
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && actx && actx.state !== 'running') actx.resume().catch(() => {}); });
+function beep(n = 2) {
+  if (!alertsOn || !actx) return;
+  try {
+    if (navigator.audioSession) { navigator.audioSession.type = 'playback'; clearTimeout(sessionTimer); sessionTimer = setTimeout(() => { try { navigator.audioSession.type = 'auto'; } catch (e) {} }, 400 * n + 600); }
+    if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime + 0.05;
+    for (let k = 0; k < n; k++) {
+      const o = actx.createOscillator(), g = actx.createGain(), t0 = t + k * 0.38;
+      o.type = 'sine'; o.frequency.value = k % 2 ? 660 : 880;
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.7, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+      o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + 0.34);
+    }
+  } catch (e) { log('So: ' + e.message); }
+}
+function buzz(pattern) {
+  if (!alertsOn) return;
+  if (navigator.vibrate) { navigator.vibrate(pattern); return; }
+  try { // iPhone: one tap per pulse of the pattern (on, off, on…)
+    if (!hapticEl) {
+      hapticEl = document.createElement('label'); hapticEl.setAttribute('aria-hidden', 'true');
+      hapticEl.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;overflow:hidden';
+      const i = document.createElement('input'); i.type = 'checkbox'; i.setAttribute('switch', ''); i.tabIndex = -1;
+      hapticEl.appendChild(i); document.body.appendChild(hapticEl);
+    }
+    const pulses = Array.isArray(pattern) ? Math.ceil(pattern.length / 2) : 1;
+    for (let k = 0; k < pulses; k++) setTimeout(() => hapticEl.click(), k * 180);
+  } catch (e) {}
+}
+function setAlerts(on) {
+  alertsOn = on; try { localStorage.setItem('nl-avisos', on ? 'si' : 'no'); } catch (e) {}
+  $('alertBtn').textContent = alertName() + ': ' + (on ? 'sí' : 'no'); $('alertBtn').setAttribute('aria-pressed', on);
+  if (on) { unlockAudio(); beep(1); buzz(120); }
+  log(alertName() + ': ' + (on ? 'sí' : 'no'));
+}
+$('alertBtn').onclick = () => setAlerts(!alertsOn);
+$('alertBtn').textContent = alertName() + ': ' + (alertsOn ? 'sí' : 'no'); $('alertBtn').setAttribute('aria-pressed', alertsOn);
 $('voiceBtn').onclick = () => { voiceOn = !voiceOn; $('voiceBtn').textContent = 'Veu: ' + (voiceOn ? 'sí' : 'no'); $('voiceBtn').setAttribute('aria-pressed', voiceOn); };
 
 /* ---------- map ---------- */
@@ -331,8 +390,8 @@ function s2w(sx, sy) {
 }
 // Ortho tiles: loaded on demand (the service worker serves saved ones offline).
 const tiles = new Map();
-function tile(z, x, y) {
-  const url = ORTO_URL(z, x, y); let t = tiles.get(url);
+function tile(z, x, y, urlOf = ORTO_URL) {
+  const url = urlOf(z, x, y); let t = tiles.get(url);
   if (!t) {
     t = {img: new Image(), ok: false, bad: false}; t.img.crossOrigin = 'anonymous';
     t.img.onload = () => { t.ok = true; draw(); }; t.img.onerror = () => { t.bad = true; };
@@ -340,19 +399,19 @@ function tile(z, x, y) {
   }
   return t;
 }
-function paintOrtho() {
+function paintOrtho(urlOf = ORTO_URL, maxZ = ORTO_MAX_Z) {
   const mpp = 1 / (view.s * DPR), lat = LAT0 * Math.PI / 180;
   let z = Math.round(Math.log2(156543.03 * Math.cos(lat) / mpp));
-  z = Math.max(12, Math.min(navigator.onLine ? ORTO_MAX_Z : ORTO_DL_Z[ORTO_DL_Z.length - 1], z));
+  z = Math.max(12, Math.min(navigator.onLine ? maxZ : ORTO_DL_Z[ORTO_DL_Z.length - 1], z));
   const corners = [[0, 0], [W, 0], [0, H], [W, H]].map(([sx, sy]) => toLL(s2w(sx, sy)));
   const xs = corners.map(c => lon2tx(c[1], z)), ys = corners.map(c => lat2ty(c[0], z));
   const tx0 = Math.floor(Math.min(...xs)), tx1 = Math.floor(Math.max(...xs)), ty0 = Math.floor(Math.min(...ys)), ty1 = Math.floor(Math.max(...ys));
   if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 80) return;
   for (let x = tx0; x <= tx1; x++) for (let y = ty0; y <= ty1; y++) {
     // not loaded yet or missing: use the closest parent tile already loaded, enlarged
-    let t = tile(z, x, y), sx = 0, sy = 0, sw = 256;
+    let t = tile(z, x, y, urlOf), sx = 0, sy = 0, sw = 256;
     for (let up = 1; !t.ok && up <= 4 && z - up >= 12; up++) {
-      const f = 2 ** up, px = Math.floor(x / f), py = Math.floor(y / f), cand = tile(z - up, px, py);
+      const f = 2 ** up, px = Math.floor(x / f), py = Math.floor(y / f), cand = tile(z - up, px, py, urlOf);
       if (cand.ok) { t = cand; sw = 256 / f; sx = (x - px * f) * sw; sy = (y - py * f) * sw; }
     }
     if (!t.ok) continue;
@@ -364,7 +423,10 @@ function paintOrtho() {
 function paint() {
   dirty = false;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const whole = fullMap();
   ctx.fillStyle = ortho ? '#4b4a3f' : '#f2efe9'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const attr = ortho ? '© ICGC · © OpenStreetMap' : whole ? '© ICGC (mapa sencer: fora de la ruta)' : '© OpenStreetMap';
+  if ($('attr').textContent !== attr) $('attr').textContent = attr;
   const T = worldTransform(); ctx.setTransform(...T);
   const lw = n => n / view.s; // n CSS px → metres
   const fill = (k, c) => { if (layers[k]) { ctx.fillStyle = c; ctx.fill(layers[k]); } };
@@ -379,6 +441,8 @@ function paint() {
     line('major', '#fcd6a4', 7); line('mid', '#f7fabf', 5.5); line('minor', '#fff', 4.5);
     line('rail', '#888', 2, [6, 4]);
     line('path', '#fff', 3.2); line('path', '#a0522d', 1.6, [4, 3]);
+    // weak or no data although «online» (usual in the mountains): the tiles that do not arrive leave the route's map visible
+    if (whole) paintOrtho(TOPO_URL, TOPO_MAX_Z);
   }
   // route as in the Natura Local app: gold line with a brown edge, walked part in olive
   line('track', '#322820', 9); line('track', '#e9bc00', 5.5);
@@ -468,7 +532,6 @@ $('rotBtn').onclick = async () => {
 };
 $('layerBtn').onclick = () => {
   ortho = !ortho; $('layerBtn').setAttribute('aria-pressed', ortho); $('layerBtn').textContent = ortho ? 'Mapa' : 'Orto';
-  $('attr').textContent = ortho ? '© ICGC · © OpenStreetMap' : '© OpenStreetMap';
   log('Capa: ' + (ortho ? 'ortofoto' : 'mapa')); draw();
 };
 // gestures: drag to pan, pinch to zoom, wheel on desktop
@@ -609,7 +672,7 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
   // simulation with the map turned to the walking direction (smoothly), as when walking with the phone in hand
   if (src === 'sim' && headingUp && heading != null) { const t = heading * Math.PI / 180; let d = t - view.rot; d = Math.atan2(Math.sin(d), Math.cos(d)); view.rot += d * 0.35; }
   const s = snap([x, y]);
-  checkOffRoute(s.off);
+  checkOffRoute(s.off, acc || 5);
   // progress only advances when close to the track, and never jumps more than 120 m at once
   if (s.off <= TRACK_M) {
     if (!started) { started = true; maxAlong = s.along; } // first fix: start counting from where you join the route
@@ -643,16 +706,23 @@ function onPosition(lat, lon, acc, gpsHeading, src) {
 const isClose = (p, d, s) => d <= NEAR_M || (p.off > NEAR_M && s.off <= TRACK_M && Math.abs(s.along - p.along) <= NEAR_M);
 // Off the route only after several readings in a row (one bad GPS reading is not enough), and said once until back on it.
 let offCount = 0, offWarned = false;
-function checkOffRoute(off) {
+function checkOffRoute(off, acc = 5) {
+  if (!started) return; // walking to the start (station, car park) is not being off the route
+  if (off > OFFROUTE_M && acc > OFFROUTE_M) return; // a reading that imprecise (trees, buildings) neither counts nor resets
   offCount = off > OFFROUTE_M ? offCount + 1 : 0;
   $('offroute').hidden = offCount < OFF_READINGS;
+  $('offroute').textContent = navigator.onLine ? 'Fora de la ruta · mapa ampliat' : 'Fora de la ruta';
   if (offCount >= OFF_READINGS && !offWarned) {
     offWarned = true;
-    if (navigator.vibrate) navigator.vibrate([400, 150, 400]);
+    buzz([400, 150, 400, 150, 400]); beep(2);
     speak('Atenció, estàs fora de la ruta.');
+    view.s = Math.min(view.s, Math.min(W, H) * 0.35 / Math.max(off, 1)); // zoom out: you and the route in sight
+    draw(); // with coverage, the whole map (see paint)
     log('Fora de la ruta: a ' + Math.round(off) + ' m del track');
   }
-  if (off <= OFFROUTE_M - 10) offWarned = false;
+  if (off <= OFFROUTE_M - 10 && offWarned) { // back on the route: the topographic tiles are let go
+    offWarned = false; for (const k of [...tiles.keys()]) if (k.includes('/topo/')) tiles.delete(k); draw();
+  }
 }
 function updateNext(i, d) {
   let badge, name, txt;
@@ -671,7 +741,7 @@ function showClimb() {
 function updateTreasures() { const n = POIS.filter(isTreasure).length; $('sTre').textContent = `${found.size}/${n}`; $('sTre').parentElement.hidden = !n; }
 function arrive(i, treasure, more = 0) {
   const p = POIS[i], far = !treasure && p.off > NEAR_M; // far: seen from the track, not reached
-  if (navigator.vibrate) navigator.vibrate(treasure ? [200, 100, 200, 100, 400] : [250, 120, 250]);
+  buzz(treasure ? [200, 100, 200, 100, 400] : [250, 120, 250]);
   const t = $('toast'); popIdx = -1; t.className = 'toast';
   t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : far ? `A ${fmtM(dist([me.x, me.y], [p.x, p.y]))} de tu` : 'Has arribat'}</span><h3>${treasure ? '★ ' : p.num + '. '}${esc(p.name)}</h3>${more ? `<p class="muted">I ${more} punt${more > 1 ? 's' : ''} més a prop: els tens a la llista.</p>` : ''}<div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
   t.hidden = false;
@@ -683,7 +753,7 @@ function arrive(i, treasure, more = 0) {
 // A direction or warning: short notice, it does not count as a visited point.
 function arriveInfo(i) {
   const p = POIS[i];
-  if (navigator.vibrate) navigator.vibrate(150);
+  buzz(150);
   showPop(i);
   speak(p.name.toLowerCase());
   log('Indicació: ' + p.name);
@@ -692,6 +762,7 @@ let wake = null;
 async function keepAwake() { try { if ('wakeLock' in navigator) { wake = await navigator.wakeLock.request('screen'); log('Pantalla sempre encesa: sí'); } } catch (e) { log('Pantalla sempre encesa: no (' + e.message + ')'); } }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (gpsWatch != null || simTimer)) keepAwake(); });
 $('gpsBtn').onclick = () => {
+  unlockAudio();
   if (gpsWatch != null) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; $('gpsBtn').textContent = 'Activa el GPS'; return; }
   if (!('geolocation' in navigator)) { $('gpsNote').textContent = 'Aquest navegador no dona la posició.'; return; }
   stopSim(); speak('', true); // unlocks speech on iOS (needs a tap)
@@ -730,9 +801,9 @@ function startSim() {
   $('simBtn').textContent = 'Atura'; $('speedBtn').hidden = false; $('speedBtn').textContent = '×' + simSpeed;
   setFollow(true); keepAwake(); simNote(); log('Simulació ×' + simSpeed);
 }
-$('simBtn').onclick = () => simTimer ? stopSim() : startSim();
+$('simBtn').onclick = () => { unlockAudio(); simTimer ? stopSim() : startSim(); };
 $('speedBtn').onclick = () => { simSpeed = SPEEDS[(SPEEDS.indexOf(simSpeed) + 1) % SPEEDS.length]; $('speedBtn').textContent = '×' + simSpeed; simNote(); };
-$('demoBtn').onclick = () => { show(true); history.pushState({nav: 1}, ''); startSim(); };
+$('demoBtn').onclick = () => { unlockAudio(); show(true); history.pushState({nav: 1}, ''); startSim(); };
 // compass (heading-up map)
 let compassOn = false;
 async function startCompass() {
@@ -756,7 +827,7 @@ function show(nav) {
   $('home').hidden = nav; $('nav').hidden = !nav;
   if (nav) { resize(); if (!me) fitRoute(); drawProfile(); } else { if ($('nav').classList.contains('full')) setFull(false); checkOffline(); }
 }
-$('startBtn').onclick = () => { show(true); history.pushState({nav: 1}, ''); };
+$('startBtn').onclick = () => { unlockAudio(); show(true); history.pushState({nav: 1}, ''); };
 $('backBtn').onclick = () => history.back();
 addEventListener('popstate', () => { closeSheet(); show(false); });
 

@@ -2,7 +2,7 @@
 // Cache-first for everything in this folder. Bump VERSION when files change.
 // App, data and map are always saved; media and ortho tiles (zoom ≤ 17) opened online are saved too
 // (nl-rutes), so the route keeps working if coverage is lost without having downloaded it.
-const VERSION = 't2-20261113';
+const VERSION = 't3-20261115';
 const SHELL = 'nlr39477-shell-' + VERSION;
 const ROUTES = 'nlr39477-media'; // media of downloaded routes (kept across app versions)
 const SHELL_FILES = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest',
@@ -21,7 +21,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);
-  const orto = url.hostname === ORTO_HOST;
+  const orto = url.hostname === ORTO_HOST && url.pathname.includes('/orto/'); // the topographic map (off the route) is online only, not saved
   if (req.method !== 'GET' || (url.origin !== location.origin && !orto)) return;
   e.respondWith((async () => {
     const hit = await caches.match(req.url, {ignoreSearch: true});
