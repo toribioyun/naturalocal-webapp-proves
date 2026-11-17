@@ -1,6 +1,6 @@
 // Service worker of the Vallirana destination prototype (copied from desti-gualba by scripts/copia_app.py). Bump VERSION when files change.
 // App and data are saved on install; photos and ICGC map tiles (zoom ≤ 16) are saved as they are seen.
-const VERSION = 'v6-20261116';
+const VERSION = 'v7-20261117';
 const SHELL = 'nlv-shell-' + VERSION, SEEN = 'nlv-vist';
 const SHELL_FILES = ['./', 'index.html', 'desti.js', 'style.css', 'manifest.webmanifest', 'icones.js', 'icon-192.png', 'icon-512.png',
   'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2', 'fonts/raleway-latin-ext.woff2', 'data.json'];

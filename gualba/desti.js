@@ -44,7 +44,8 @@ function drawIcon(name, cx, cy, size, col) { // centred on (cx, cy)
 }
 const CAT_NAME = {arquitectura: 'Arquitectura', paisatges: 'Paisatge', indrets: 'Indret', medi: 'Medi', museus: 'Museu', altres: 'Indret',
   menjar: 'Menjar', dormir: 'Dormir', 'producte-local': 'Producte local', 'lleure-actiu': 'Lleure actiu'};
-const NEAR_TRACK = 40;
+const NEAR_TRACK = 40; // progress keeps counting up to here (a GPS jump must not stop it)
+const OFFROUTE_M = 30; // «Fora de la ruta» beyond 30 m in every web app (D-134, 17/11/2026)
 let D = null, ITEMS = [], filter = 'tot';
 const colOf = it => it.g === 'ruta' ? it.col : GROUPS[it.g].col;
 
@@ -368,7 +369,7 @@ function onPosition(lat, lon, acc, src) {
     }
     if (off <= NEAR_TRACK) { if (!started) { started = true; maxAlong = along; } else if (along >= maxAlong - 30 && along <= maxAlong + 150) maxAlong = Math.max(maxAlong, along); }
     walked = maxAlong;
-    $('offroute').hidden = off <= NEAR_TRACK;
+    $('offroute').hidden = off <= OFFROUTE_M;
     $('progBar').style.width = (100 * walked / nav.len) + '%';
     $('sDone').textContent = fmtM(walked); $('sLeft').textContent = fmtM(Math.max(0, nav.len - walked)); $('sOff').textContent = fmtM(off);
     if (src === 'gps') $('gpsNote').textContent = `GPS: precisió ±${Math.round(acc)} m`;
