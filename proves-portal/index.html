@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Prova · Natura Local · Destins</title>
+<meta name="description" content="Prototip de web app de Natura Local: tots els destins al mapa, amb cerca de pobles, rutes i llocs.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#322820">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Portal prova">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="fulla.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+<div id="app">
+  <header class="appbar">
+    <img src="logo.svg" alt="Natura Local" class="logo">
+    <span class="proto">Prototip</span>
+    <span id="net" class="net" aria-live="polite"></span>
+  </header>
+  <form class="search" id="searchForm" role="search" autocomplete="off">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <input id="q" type="search" placeholder="Cerca un poble, una ruta o un lloc" aria-label="Cerca un poble, una ruta o un lloc" enterkeyhint="search">
+    <button type="button" id="qClear" class="clear" aria-label="Esborra la cerca" hidden>×</button>
+  </form>
+  <section id="vMapa" class="view">
+    <canvas id="map" aria-label="Mapa amb tots els destins de Natura Local"></canvas>
+    <div id="results" class="results" role="listbox" aria-label="Resultats de la cerca" hidden></div>
+    <div class="mapbtns">
+      <button id="zin" aria-label="Apropa">+</button>
+      <button id="zout" aria-label="Allunya">−</button>
+      <button id="meBtn" aria-pressed="false" title="Destins a prop meu" aria-label="Destins a prop meu">◎</button>
+    </div>
+    <div id="pop" class="toast info" hidden></div>
+    <div class="pcards" id="cards" aria-label="Destins"></div>
+    <div id="attr" class="attr">© ICGC</div>
+  </section>
+</div>
+<script src="icones.js"></script>
+<script src="portal.js"></script>
+</body>
+</html>

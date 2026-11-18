@@ -1,0 +1,24 @@
+/* Portal (O-033): search bar, results, destination cards. The rest comes from style.css (the destination app's). */
+.search{display:flex;align-items:center;gap:8px;margin:0;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);color:var(--muted);flex:none}
+.search input{flex:1 1 auto;min-width:0;font:600 1rem var(--font);color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:999px;padding:10px 14px;min-height:44px;-webkit-appearance:none;appearance:none}
+.search input:focus{outline:none;border-color:var(--olive)}
+.search input::-webkit-search-cancel-button{display:none}
+.search .clear{min-height:40px;width:40px;padding:0;font-size:1.3rem;line-height:1}
+.results{position:absolute;left:0;right:0;top:0;max-height:70%;overflow-y:auto;background:var(--panel);border-bottom:1px solid var(--line);box-shadow:0 8px 18px #0003;z-index:5}
+.res{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;padding:10px 16px;min-height:56px;font-weight:400}
+.res span:last-child{display:flex;flex-direction:column;min-width:0}
+.res b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.res small{color:var(--muted);font-size:.82rem}
+.pdot{flex:none;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #0002}
+.pdot.town{background:var(--brown);border-color:var(--gold);width:16px;height:16px}
+.none{margin:0;padding:14px 16px;color:var(--muted)}
+.pcards{position:absolute;left:0;right:0;bottom:calc(22px + env(safe-area-inset-bottom));display:flex;gap:10px;overflow-x:auto;padding:4px 12px 6px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.pcards::-webkit-scrollbar{display:none}
+.pcard{flex:none;width:min(300px,82vw);scroll-snap-align:center;display:flex;gap:10px;background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:8px;box-shadow:0 4px 12px #0004;cursor:pointer}
+.pcard.on{border-color:var(--gold)}
+.pcard img{width:84px;height:84px;object-fit:cover;border-radius:10px;flex:none;background:var(--brown-2)}
+.pcard .txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pcard h2{margin:0;font-size:1.1rem}
+.pcard p{margin:0;font-size:.82rem;color:var(--muted)}
+.pcard .open{margin-top:auto;font-weight:800;color:var(--link,#4f6f09);text-decoration:none;padding:6px 0}
+.toast .row{display:flex;gap:8px;align-items:center}
