@@ -290,3 +290,12 @@ a.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--brown)
 .rf-foot button:disabled{opacity:.5}
 .fbtn{white-space:nowrap}.fbtn[aria-pressed="true"]{background:var(--brown);color:var(--gold);border-color:var(--brown)}
 .rf-note{margin:-4px 0 10px;color:var(--muted);font-size:.9rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rf-sw{display:grid;gap:10px;margin-top:18px}
+.rf-swi{display:flex;align-items:center;gap:12px;text-align:left;border-radius:16px;padding:12px;background:var(--panel);border:1px solid var(--line);font-weight:400}
+.rf-swi:disabled{opacity:.55}
+.rf-swic{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--bg);color:var(--muted);flex:none}
+.rf-swt{display:flex;flex-direction:column;flex:1;min-width:0}.rf-swt b{font-weight:700}.rf-swt small{color:var(--muted)}
+.rf-tog{width:50px;height:30px;border-radius:15px;background:var(--line);position:relative;flex:none;transition:background .15s}
+.rf-tog::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0004;transition:left .15s}
+.rf-swi[aria-pressed="true"] .rf-tog{background:var(--gold)}.rf-swi[aria-pressed="true"] .rf-tog::after{left:23px}
+.rf-swi[aria-pressed="true"] .rf-swic{color:var(--brown);background:#fdf3c8}

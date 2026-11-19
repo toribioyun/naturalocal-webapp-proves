@@ -2,6 +2,8 @@
    the Natura Local app (activity, difficulty) plus the type of route, which Toribio asked for. Each route carries mo, df
    and tp (portal/scripts/genera.py, route_attrs). Only the options that some route has are shown. The choice is kept for
    the session (sessionStorage), so a filter chosen in the portal is still on in the destination, and the other way round.
+   Two switches as in the app: only gamified routes (gam) and only inclusive routes (inc), marks of the route API of the web
+   (portal/scripts/marques_rutes.py); «recommended» is not wanted (Toribio, 19/11/2026).
    Usage: RF.ok(route) → shown or not; RF.count() → how many choices are on; RF.open(routes, onChange) → the panel. */
 'use strict';
 const RF = (() => {
@@ -16,16 +18,20 @@ const RF = (() => {
     ['tp', 'Tipologia', [['Circular', 'Circular'], ['Lineal', 'Lineal'], ['Travessa', 'Travessa']]],
   ];
   const KEY = 'tpnl-filtre-rutes';
-  let on = {mo: [], df: [], tp: []};
-  try { const s = JSON.parse(sessionStorage.getItem(KEY)); if (s) on = {mo: s.mo || [], df: s.df || [], tp: s.tp || []}; } catch (e) {}
+  const SWITCHES = [['gam', 'Només rutes gamificades', 'Amb premis i recompenses', '<path d="M6 3h12l4 6-10 12L2 9zm1.2 2L4.6 9h3.9l1.6-4zm5 0-1.7 4h3.1l-1.4-4zm3.8 0 1.6 4h3.9l-2.6-4zM4.7 11l5.6 6.7L8.2 11zm5.6 0 1.7 5.3 1.7-5.3zm5.6 0-2.1 6.7 5.6-6.7z"/>'],
+    ['inc', 'Només rutes inclusives', 'Accessibles per a tothom', '<path d="M12 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm-1 5h2v5h4l3 6-1.8.9L16.8 14H11zm-1.5 3.2.4 2A5 5 0 1 0 15.6 18l1.6 1.2A7 7 0 1 1 9.5 10.2z"/>']];
+  const empty = () => ({mo: [], df: [], tp: [], gam: false, inc: false});
+  let on = empty();
+  try { const s = JSON.parse(sessionStorage.getItem(KEY)); if (s) on = {...empty(), ...s}; } catch (e) {}
   const save = () => { try { sessionStorage.setItem(KEY, JSON.stringify(on)); } catch (e) {} };
-  const okWith = (sel, r) => GROUPS.every(([k]) => !sel[k].length || sel[k].includes(r[k]));
+  const okWith = (sel, r) => GROUPS.every(([k]) => !sel[k].length || sel[k].includes(r[k])) && SWITCHES.every(([k]) => !sel[k] || r[k]);
   const ok = r => okWith(on, r);
-  const count = () => on.mo.length + on.df.length + on.tp.length;
+  const countOf = sel => sel.mo.length + sel.df.length + sel.tp.length + (sel.gam ? 1 : 0) + (sel.inc ? 1 : 0);
+  const count = () => countOf(on);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 
   function open(routes, onChange) {
-    let draft = {mo: [...on.mo], df: [...on.df], tp: [...on.tp]};
+    let draft = {...on, mo: [...on.mo], df: [...on.df], tp: [...on.tp]};
     let el = document.getElementById('rfSheet');
     if (!el) { el = document.createElement('div'); el.id = 'rfSheet'; el.className = 'sheet rf'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Filtra les rutes'); document.body.appendChild(el); }
     const render = () => {
@@ -41,12 +47,18 @@ const RF = (() => {
             return `<button data-k="${k}" data-v="${esc(v)}" aria-pressed="${p}">${pic}<span>${label}</span><small>${c}</small></button>`;
           }).join('')}</div>`;
         }).join('')}
-        <div class="rf-foot"><button id="rfClear" ${draft.mo.length + draft.df.length + draft.tp.length ? '' : 'disabled'}>Treu els filtres</button>
+        <div class="rf-sw">${SWITCHES.map(([k, title, sub, ic]) => {
+          const c = routes.filter(r => r[k]).length;
+          return `<button class="rf-swi" data-sw="${k}" aria-pressed="${!!draft[k]}" ${c ? '' : 'disabled'}><span class="rf-swic"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="currentColor">${ic}</svg></span>
+            <span class="rf-swt"><b>${title}</b><small>${c ? `${sub} · ${c} ${c === 1 ? 'ruta' : 'rutes'}` : 'Cap ruta encara'}</small></span><span class="rf-tog" aria-hidden="true"></span></button>`;
+        }).join('')}</div>
+        <div class="rf-foot"><button id="rfClear" ${countOf(draft) ? '' : 'disabled'}>Treu els filtres</button>
         <button class="primary grow" id="rfApply" ${n ? '' : 'disabled'}>${n ? `Mostra ${n} ${n === 1 ? 'ruta' : 'rutes'}` : 'Cap ruta amb aquests filtres'}</button></div></div>`;
       el.querySelectorAll('.rf-opts button').forEach(b => b.onclick = () => {
         const a = draft[b.dataset.k], i = a.indexOf(b.dataset.v); i < 0 ? a.push(b.dataset.v) : a.splice(i, 1); render();
       });
-      el.querySelector('#rfClear').onclick = () => { draft = {mo: [], df: [], tp: []}; render(); };
+      el.querySelectorAll('.rf-swi').forEach(b => b.onclick = () => { draft[b.dataset.sw] = !draft[b.dataset.sw]; render(); });
+      el.querySelector('#rfClear').onclick = () => { draft = empty(); render(); };
       el.querySelector('#rfApply').onclick = () => { on = draft; save(); close(); onChange(); };
       el.querySelector('#rfClose').onclick = close;
     };
@@ -54,7 +66,7 @@ const RF = (() => {
     el.onclick = e => { if (e.target === el) close(); };
     render(); el.hidden = false;
   }
-  const clear = () => { on = {mo: [], df: [], tp: []}; save(); };
+  const clear = () => { on = empty(); save(); };
   const label = () => count() ? `Filtres · ${count()}` : 'Filtra les rutes';
   return {ok, count, open, clear, label};
 })();
