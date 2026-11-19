@@ -90,7 +90,7 @@ function prepare() {
     return it;
   });
 }
-const shown = it => filter === 'tot' || it.g === filter;
+const shown = it => (filter === 'tot' || it.g === filter) && (it.g !== 'ruta' || RF.ok(it)); // routes: also the route filter (filtre.js)
 const catLabel = it => it.g === 'ruta' ? 'Ruta' : CAT_NAME[it.cat] || it.cat;
 const byName = Object.create(null);
 const plain = html => { const t = document.createElement('div'); t.innerHTML = html; return t.textContent.trim(); };
@@ -99,10 +99,19 @@ const plain = html => { const t = document.createElement('div'); t.innerHTML = h
 function renderChips() {
   const n = g => ITEMS.filter(i => i.g === g).length;
   $('chips').innerHTML = [['tot', 'Tot', ITEMS.length], ...Object.entries(GROUPS).map(([g, v]) => [g, v.label, n(g)])]
-    .filter(c => c[2]).map(([g, l, c]) => `<button data-g="${g}" aria-pressed="${g === filter}">${g === 'tot' ? '' : `<span class="dot" style="background:${GROUPS[g].col}">${svgIcon(GROUP_ICON[g], '#fff', 12)}</span>`}${l}<small>${c}</small></button>`).join('');
+    .filter(c => c[2]).map(([g, l, c]) => `<button data-g="${g}" aria-pressed="${g === filter}">${g === 'tot' ? '' : `<span class="dot" style="background:${GROUPS[g].col}">${svgIcon(GROUP_ICON[g], '#fff', 12)}</span>`}${l}<small>${c}</small></button>`
+      + (g === 'ruta' && c > 1 ? `<button id="fBtn" class="fbtn" aria-pressed="${RF.count() > 0}">${FUNNEL}${RF.label()}</button>` : '')).join(''); // the route filter, next to «Rutes»
+}
+const FUNNEL = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><path d="M3 5h18l-7 8v6l-4 2v-8z" fill="currentColor"/></svg>';
+function openRouteFilter() {
+  RF.open(ITEMS.filter(i => i.g === 'ruta'), () => {
+    if (filter !== 'tot' && filter !== 'ruta') filter = 'ruta'; // the filter is about routes: show them
+    renderChips(); renderGuide(); hidePop(); draw();
+  });
 }
 $('chips').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'fBtn') { openRouteFilter(); return; }
   filter = b.dataset.g; renderChips(); renderGuide(); hidePop(); draw();
 };
 
@@ -121,11 +130,14 @@ function moveDots(el, g) { const k = Math.round(g.scrollLeft / (g.clientWidth ||
 function gallery(el, pics) { el.innerHTML = pics.map(([f, c]) => `<img src="${f}" alt="${esc(c)}" loading="lazy">`).join(''); el.scrollLeft = 0; }
 function renderGuide() {
   const sec = (g, title) => {
-    const list = ITEMS.filter(i => i.g === g && shown(i)); if (!list.length) return '';
-    return `<h2 class="gsec">${title}<small>${list.length}</small></h2><ul class="cards">${list.map(it => {
+    const list = ITEMS.filter(i => i.g === g && shown(i)), all = ITEMS.filter(i => i.g === g).length;
+    const filtered = g === 'ruta' && RF.count() > 0;
+    if (!list.length && !filtered) return '';
+    return `<h2 class="gsec">${title}<small>${filtered ? `${list.length} de ${all}` : list.length}</small></h2>${filtered
+      ? `<p class="rf-note">Amb filtres. <button class="small" data-rf="edit">Canvia'ls</button> <button class="small" data-rf="clear">Treu-los</button></p>` : ''}<ul class="cards">${list.map(it => {
       const th = it.pics[0] ? `<span class="thw"><img src="${it.pics[0][0]}" alt="" loading="lazy"><span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 13)}</span></span>`
         : `<span class="ph" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 32)}</span>`;
-      const sub = it.g === 'ruta' ? [it.km + ' km', it.dur, it.dif].join(' · ') : plain(it.desc[0] || '').slice(0, 70) + '…';
+      const sub = it.g === 'ruta' ? [it.mo === 'bici' && 'En bici', it.km + ' km', it.mo === 'bici' ? it.durBici : it.dur, it.df || it.dif].filter(Boolean).join(' · ') : plain(it.desc[0] || '').slice(0, 70) + '…';
       return `<li><button data-i="${it.i}">${th}<span><small>${esc(catLabel(it))}</small><b>${esc(it.n)}</b><span class="sub">${esc(sub)}</span></span><span class="chev">›</span></button></li>`;
     }).join('')}</ul>`;
   };
@@ -154,7 +166,11 @@ function calendar() {
   return `<h2 class="gsec">Quan anar-hi</h2>` + (f ? `<article class="fira"><img src="${f.foto}" alt="${esc(f.alt)}" loading="lazy"><div class="pad-s"><span class="flag">${esc(f.quan)}</span><h3>${esc(f.titol)}</h3><p>${esc(f.text)}</p><small>${f.fonts}</small></div></article>` : '')
     + `<ul class="when">${c.dates.map(([q, t]) => `<li><b>${esc(q)}</b><span>${esc(t)}</span></li>`).join('')}</ul>`;
 }
-$('guide').onclick = e => { const b = e.target.closest('button[data-i]'); if (b) openSheet(+b.dataset.i); };
+$('guide').onclick = e => {
+  const f = e.target.closest('button[data-rf]');
+  if (f) { if (f.dataset.rf === 'edit') openRouteFilter(); else { RF.clear(); renderChips(); renderGuide(); draw(); } return; }
+  const b = e.target.closest('button[data-i]'); if (b) openSheet(+b.dataset.i);
+};
 
 /* ---------- detail sheet ---------- */
 function openSheet(i) {
@@ -386,7 +402,7 @@ function tapAt(x, y) {
 function showPop(it) {
   sel = it; const p = $('pop');
   const d = me ? ' · a ' + fmtM(dist([me.x, me.y], [it.x, it.y])) : '';
-  const txt = it.g === 'ruta' ? [it.km + ' km', it.dur, it.des, it.dif].join(' · ') : plain(it.desc[0] || '').slice(0, 140);
+  const txt = it.g === 'ruta' ? [it.mo === 'bici' && 'En bici', it.km + ' km', it.mo === 'bici' ? it.durBici : it.dur, it.des, it.df || it.dif].filter(Boolean).join(' · ') : plain(it.desc[0] || '').slice(0, 140);
   p.innerHTML = `<span class="t"><span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}${d}</span><h3>${esc(it.n)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}
     <div class="row"><button class="primary grow" id="pMore">Més informació ›</button>${it.app ? `<a class="btn" href="${it.app}">Navega</a>` : it.g === 'ruta' ? '<button id="pNav">Navega</button>' : ''}<button id="pClose" aria-label="Tanca">×</button></div>`;
   p.hidden = nav != null;

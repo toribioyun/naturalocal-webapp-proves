@@ -272,3 +272,21 @@ a.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--brown)
 .home:not([hidden])~.logo{height:24px}
 .appbar:has(.home:not([hidden])){gap:8px;padding-left:12px;padding-right:12px}
 @media (max-width:400px){.home:not([hidden])~.proto{font-size:.6rem;padding:1px 4px}.home:not([hidden])~.net{font-size:.72rem;padding:3px 7px}}
+/* route filter (filtre.js, O-047): like the filter of the Natura Local app */
+.rf .rf-in{padding:14px 16px calc(16px + env(safe-area-inset-bottom));gap:4px}
+.rf-grip{display:block;width:46px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 6px}
+.rf .close{top:10px;right:10px}
+.rf-h{margin:4px 0 6px;font-size:1.25rem}
+.rf h3{margin:14px 0 8px;font-size:1rem}
+.rf-opts{display:flex;flex-wrap:wrap;gap:10px}
+.rf-opts button{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:84px;border-radius:14px;padding:10px 12px;font-weight:600;background:var(--bg);border-color:transparent}
+.rf-opts button small{font-weight:400;color:var(--muted);font-size:.75rem}
+.rf-opts button[aria-pressed="true"]{border-color:var(--gold);background:#fdf3c8;color:var(--brown)}
+.rf-mo button{border-radius:999px;min-width:96px}
+.rf-ic{display:grid;place-items:center;width:54px;height:54px;border-radius:50%;background:var(--gold);color:var(--brown)}
+.rf-mo button[aria-pressed="true"] .rf-ic{box-shadow:0 0 0 3px var(--brown)}
+.rf-dots{display:flex;gap:4px}.rf-dots i{width:9px;height:9px;border-radius:50%;background:var(--line)}.rf-dots i.f{background:var(--gold)}
+.rf-foot{display:flex;gap:10px;margin-top:18px;position:sticky;bottom:0;background:var(--panel);padding-top:8px}
+.rf-foot button:disabled{opacity:.5}
+.fbtn{white-space:nowrap}.fbtn[aria-pressed="true"]{background:var(--brown);color:var(--gold);border-color:var(--brown)}
+.rf-note{margin:-4px 0 10px;color:var(--muted);font-size:.9rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap}

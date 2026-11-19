@@ -24,3 +24,5 @@
 .pcard .open{margin-top:auto;font-weight:800;color:var(--link,#4f6f09);text-decoration:none;padding:6px 0}
 .toast .row{display:flex;gap:8px;align-items:center}
 .attr a{color:inherit}
+.pmode{flex:none}
+.rcard h2{font-size:1rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

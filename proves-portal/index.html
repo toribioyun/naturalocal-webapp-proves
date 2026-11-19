@@ -29,6 +29,9 @@
     <input id="q" type="search" placeholder="Cerca un poble, una ruta o un lloc" aria-label="Cerca un poble, una ruta o un lloc" enterkeyhint="search">
     <button type="button" id="qClear" class="clear" aria-label="Esborra la cerca" hidden>×</button>
   </form>
+  <div class="chips pmode" id="pmode" role="group" aria-label="Què vols veure al mapa">
+    <button id="mDest" aria-pressed="true">Destins</button><button id="mRut" aria-pressed="false">Rutes</button><button id="fBtn" class="fbtn" hidden></button>
+  </div>
   <section id="vMapa" class="view">
     <canvas id="map" aria-label="Mapa amb tots els destins de Natura Local"></canvas>
     <div id="results" class="results" role="listbox" aria-label="Resultats de la cerca" hidden></div>
@@ -43,6 +46,7 @@
   </section>
 </div>
 <script src="icones.js"></script>
+<script src="filtre.js"></script>
 <script src="portal.js"></script>
 </body>
 </html>

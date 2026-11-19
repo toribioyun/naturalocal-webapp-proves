@@ -13,6 +13,9 @@ const GROUPS = {
 const TILE = (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
 const ITEMS_FROM_Z = 11.5; // routes and places show from here; below, only the destinations
 let DATA = {D: [], I: [], T: []}, sel = null, popItem = null, me = null;
+// «Destins» (the destinations) or «Rutes» (every route of every destination, with the route filter, O-047, 19/11/2026)
+let mode = 'dest', TRK = new Map();
+const routes = () => DATA.I.filter(i => i.g === 'ruta' && RF.ok(i));
 
 function updateNet() { const on = navigator.onLine; $('net').textContent = on ? 'Amb connexió' : 'Sense connexió'; $('net').classList.toggle('off', !on); }
 addEventListener('online', () => { updateNet(); tiles.clear(); draw(); });
@@ -69,6 +72,7 @@ function paint() {
   dirty = false; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#e8e2d2'; ctx.fillRect(0, 0, W, H);
   paintTiles();
+  if (mode === 'rut') { paintRoutes(); return; }
   if (showItems()) {
     ctx.lineJoin = ctx.lineCap = 'round';
     for (const t of DATA.T) {
@@ -93,6 +97,23 @@ function paint() {
     const [x, y] = ll2s(popItem.lat, popItem.lon); pin(x, y, '#e8590c', 13);
     ctx.beginPath(); ctx.arc(x, y - 23.4, 5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
   }
+  if (me) { const [x, y] = ll2s(me[0], me[1]); ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fillStyle = '#1b6ca8'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+}
+function paintRoutes() { // «Rutes»: the routes that pass the filter, at any zoom; destinations only as a name
+  ctx.lineJoin = ctx.lineCap = 'round';
+  const list = routes();
+  if (view.z >= 9.5) for (const it of list) {
+    const t = TRK.get(it.c + '/' + it.id); if (!t) continue;
+    ctx.beginPath(); t.tr.forEach((p, k) => { const [x, y] = ll2s(p[0], p[1]); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    const on = popItem === it;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = on ? 8 : 5; ctx.stroke(); ctx.strokeStyle = on ? '#e8590c' : it.mo === 'bici' ? '#1f6f8b' : '#69920c'; ctx.lineWidth = on ? 5 : 2.5; ctx.stroke();
+  }
+  for (const d of DATA.D) { const [x, y] = ll2s(d.lat, d.lon); label(short(d), x, y + 4, false); }
+  for (const it of list) {
+    const [x, y] = ll2s(it.lat, it.lon); if (x < -20 || y < -20 || x > W + 20 || y > H + 20 || it === popItem) continue;
+    pin(x, y, it.mo === 'bici' ? '#1f6f8b' : GROUPS.ruta.col, 8);
+  }
+  if (popItem) { const [x, y] = ll2s(popItem.lat, popItem.lon); pin(x, y, '#e8590c', 13); ctx.beginPath(); ctx.arc(x, y - 23.4, 5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); }
   if (me) { const [x, y] = ll2s(me[0], me[1]); ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fillStyle = '#1b6ca8'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke(); }
 }
 function fit(pts, pad = 50, maxZ = 15) {
@@ -124,7 +145,8 @@ function tapAt(x, y) {
   hideResults();
   let best = null, bd = 30;
   const near = (lat, lon, dy, obj) => { const [sx, sy] = ll2s(lat, lon), d = Math.hypot(sx - x, sy - dy - y); if (d < bd) { bd = d; best = obj; } };
-  if (showItems()) DATA.I.forEach(it => near(it.lat, it.lon, it.g === 'ruta' ? 12 : 0, it));
+  if (mode === 'rut') routes().forEach(it => near(it.lat, it.lon, 12, it));
+  else if (showItems()) DATA.I.forEach(it => near(it.lat, it.lon, it.g === 'ruta' ? 12 : 0, it));
   else DATA.D.forEach(d => near(d.lat, d.lon, 18, d));
   if (!best) { hidePop(); return; }
   if (best.c && best.id) showPop(best); else selectDest(best, true);
@@ -135,7 +157,35 @@ const destOf = c => DATA.D.find(d => d.c === c);
 const short = d => d.nc || d.n; // a park has a long name: «Montgrí» in labels and buttons
 const fmtKm = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 1 : 0).replace('.', ',') + ' km';
 function km(a, b) { const R = 6371000, r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r; const h = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); }
+const MODE_NAME = {peu: 'A peu', bici: 'En bici', cavall: 'A cavall'};
+function renderRouteCards() {
+  const list = routes();
+  if (me) list.sort((a, b) => km(me, [a.lat, a.lon]) - km(me, [b.lat, b.lon])); else list.sort((a, b) => a.n.localeCompare(b.n, 'ca'));
+  $('cards').innerHTML = list.length ? list.map(it => `<article class="pcard rcard" data-k="${esc(it.c + '/' + it.id)}">
+    ${it.f ? `<img src="${esc(it.c)}/${esc(it.f)}" alt="" loading="lazy">` : ''}
+    <div class="txt"><h2>${esc(it.n)}</h2>
+      <p>${[MODE_NAME[it.mo], it.km && it.km + ' km', it.df, it.tp].filter(Boolean).map(esc).join(' · ')}${me ? ` · <b>a ${fmtKm(km(me, [it.lat, it.lon]))}</b>` : ''}</p>
+      <p class="muns">${esc(short(destOf(it.c)))}${it.m ? ' · ' + esc(it.m.split(', ')[0]) : ''}</p>
+      <a class="open" href="${esc(it.c)}/#ruta-${encodeURIComponent(it.id)}">Obre la fitxa ›</a></div></article>`).join('')
+    : '<p class="none">Cap ruta amb aquests filtres.</p>';
+  $('cards').querySelectorAll('.rcard').forEach(el => el.onclick = e => {
+    if (e.target.closest('a')) return;
+    const it = DATA.I.find(i => i.g === 'ruta' && i.c + '/' + i.id === el.dataset.k); showPop(it); flyTo(it.lat, it.lon, Math.max(view.z, 13));
+  });
+}
+function setMode(m, refit) {
+  mode = m; $('mDest').setAttribute('aria-pressed', m === 'dest'); $('mRut').setAttribute('aria-pressed', m === 'rut');
+  $('fBtn').hidden = m !== 'rut'; $('fBtn').innerHTML = FUNNEL + RF.label(); $('fBtn').setAttribute('aria-pressed', RF.count() > 0);
+  hidePop(); renderCards();
+  if (refit) { const pts = m === 'rut' ? routes().map(i => [i.lat, i.lon]) : DATA.D.map(d => [d.lat, d.lon]); if (pts.length) fit(pts, 60, 12); }
+  draw(); remember();
+}
+const FUNNEL = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><path d="M3 5h18l-7 8v6l-4 2v-8z" fill="currentColor"/></svg>';
+$('mDest').onclick = () => setMode('dest', true);
+$('mRut').onclick = () => setMode('rut', true);
+$('fBtn').onclick = () => RF.open(DATA.I.filter(i => i.g === 'ruta'), () => setMode('rut', true));
 function renderCards() {
+  if (mode === 'rut') { renderRouteCards(); return; }
   const list = [...DATA.D];
   if (me) list.sort((a, b) => km(me, [a.lat, a.lon]) - km(me, [b.lat, b.lon])); else list.sort((a, b) => a.n.localeCompare(b.n, 'ca'));
   $('cards').innerHTML = list.map(d => `<article class="pcard${d === sel ? ' on' : ''}" data-c="${esc(d.c)}">
@@ -206,14 +256,15 @@ $('meBtn').onclick = () => {
 };
 
 /* ---------- start: back from a destination returns to the same view ---------- */
-function remember() { try { sessionStorage.setItem('tpnl-portal-vista', JSON.stringify({x: view.x, y: view.y, z: view.z, sel: sel && sel.c, q: $('q').value})); } catch (e) {} }
+function remember() { try { sessionStorage.setItem('tpnl-portal-vista', JSON.stringify({x: view.x, y: view.y, z: view.z, sel: sel && sel.c, q: $('q').value, mode})); } catch (e) {} }
 addEventListener('pagehide', remember);
 async function start() {
   updateNet(); resize();
   try { DATA = await (await fetch('cerca.json')).json(); } catch (e) { $('cards').innerHTML = '<p class="none">No s’han pogut carregar els destins. Torna-ho a provar amb connexió.</p>'; return; }
+  TRK = new Map(DATA.T.map(t => [t.c + '/' + t.id, t]));
   renderCards();
   let v = null; try { v = JSON.parse(sessionStorage.getItem('tpnl-portal-vista')); } catch (e) {}
-  if (v && isFinite(v.z)) { Object.assign(view, {x: v.x, y: v.y, z: v.z}); sel = v.sel ? destOf(v.sel) || null : null; renderCards(); if (v.q) { $('q').value = v.q; $('qClear').hidden = false; } draw(); }
+  if (v && isFinite(v.z)) { Object.assign(view, {x: v.x, y: v.y, z: v.z}); sel = v.sel ? destOf(v.sel) || null : null; if (v.mode === 'rut') setMode('rut', false); else renderCards(); if (v.q) { $('q').value = v.q; $('qClear').hidden = false; } draw(); }
   else fit(DATA.D.map(d => [d.lat, d.lon]), 60, 11);
 }
 start();
