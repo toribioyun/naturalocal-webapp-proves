@@ -1,11 +1,11 @@
 // Service worker of the portal (O-033). VERSION is set by portal/scripts/genera.py (hash of the app files).
 // It is at the root of the site, so its scope covers every destination: it only answers for the portal's own files,
 // and leaves the rest to each destination's and route's own worker (or to the network).
-const VERSION = '78fe583dce';
+const VERSION = '577674bb85';
 const SHELL = 'tpnlp-shell-' + VERSION, SEEN = 'tpnlp-vist';
 const SHELL_FILES = ['./', 'index.html', 'portal.js', 'portal.css', 'style.css', 'manifest.webmanifest', 'icones.js', 'icon-192.png', 'icon-512.png',
   'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2', 'fonts/raleway-latin-ext.woff2', 'cerca.json'];
-const TILE_HOST = 'geoserveis.icgc.cat', TILE_SAVE_MAX_Z = 12;
+const TILE_HOST = 'tile.openstreetmap.org', TILE_SAVE_MAX_Z = 12; // only the tiles seen, as the browser would (OSM tile policy: no bulk download)
 const ROOT = new URL('./', self.location).pathname;
 const OWN = new Set(SHELL_FILES.map(f => new URL(f, self.location).pathname));
 

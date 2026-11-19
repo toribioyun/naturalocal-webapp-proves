@@ -1,6 +1,6 @@
 /* Natura Local – portal prototype (O-033): every destination on one map, a search of towns, routes and places, and links
    into each destination app (../<folder>/), which has a way back here. Data: cerca.json, built by portal/scripts/genera.py
-   from each destination's data.json. Base map: ICGC topographic map (online). */
+   from each destination's data.json. Base map: OpenStreetMap (online). */
 'use strict';
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
@@ -9,7 +9,8 @@ const GROUPS = {
   ruta: {label: 'Ruta', col: '#69920c'}, visita: {label: 'Visita', col: '#e9bc00'}, menjar: {label: 'Menjar', col: '#c4541c'},
   dormir: {label: 'Dormir', col: '#5b4a3b'}, altres: {label: 'Servei', col: '#1f6f8b'},
 };
-const TILE = (z, x, y) => `https://geoserveis.icgc.cat/icc_mapesmultibase/noutm/wmts/topo/GRID3857/${z}/${x}/${y}.jpeg`;
+// OpenStreetMap, the same map as the destination app (Toribio, 19/11/2026: one map everywhere, with its credit below)
+const TILE = (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
 const ITEMS_FROM_Z = 11.5; // routes and places show from here; below, only the destinations
 let DATA = {D: [], I: [], T: []}, sel = null, popItem = null, me = null;
 
@@ -83,10 +84,10 @@ function paint() {
   }
   for (const d of DATA.D) {
     const [x, y] = ll2s(d.lat, d.lon), big = d === sel;
-    if (showItems()) { label(d.n, x, y + 4, true); continue; } // close up, the town's name is enough
+    if (showItems()) { label(short(d), x, y + 4, true); continue; } // close up, the town's name is enough
     pin(x, y, big ? '#e8590c' : '#322820', big ? 12 : 10);
     ctx.beginPath(); ctx.arc(x, y - (big ? 21.6 : 18), big ? 4.5 : 3.8, 0, 7); ctx.fillStyle = '#e9bc00'; ctx.fill();
-    label(d.n, x, y + 4, big);
+    label(short(d), x, y + 4, big);
   }
   if (popItem) { // the chosen place, on top of everything, so it is clear which one it is
     const [x, y] = ll2s(popItem.lat, popItem.lon); pin(x, y, '#e8590c', 13);
@@ -131,6 +132,7 @@ function tapAt(x, y) {
 
 /* ---------- destinations, cards and pop-up ---------- */
 const destOf = c => DATA.D.find(d => d.c === c);
+const short = d => d.nc || d.n; // a park has a long name: «Montgrí» in labels and buttons
 const fmtKm = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 1 : 0).replace('.', ',') + ' km';
 function km(a, b) { const R = 6371000, r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r; const h = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); }
 function renderCards() {
@@ -140,7 +142,8 @@ function renderCards() {
     <img src="${esc(d.c)}/${esc(d.foto)}" alt="" loading="lazy">
     <div class="txt"><h2>${esc(d.n)}</h2>
       <p>${[d.nR && `${d.nR} ${d.nR === 1 ? 'ruta' : 'rutes'}`, d.nV && `${d.nV} ${d.nV === 1 ? 'visita' : 'visites'}`, d.nS && `${d.nS} serveis`].filter(Boolean).join(' · ')}${me ? ` · <b>a ${fmtKm(km(me, [d.lat, d.lon]))}</b>` : ''}</p>
-      <a class="open" href="${esc(d.c)}/">Obre ${esc(d.n)} ›</a></div></article>`).join('');
+      ${d.parc ? `<p class="muns">Parc · ${d.m.length} municipis: ${esc(d.m.slice(0, 3).join(', '))}${d.m.length > 3 ? '…' : ''}</p>` : ''}
+      <a class="open" href="${esc(d.c)}/">Obre ${esc(short(d))} ›</a></div></article>`).join('');
   $('cards').querySelectorAll('.pcard').forEach(el => el.onclick = e => { if (e.target.closest('a')) return; selectDest(destOf(el.dataset.c), false); });
 }
 function selectDest(d, scrollCard) {
@@ -151,8 +154,8 @@ function selectDest(d, scrollCard) {
 }
 function showPop(it) {
   popItem = it; const d = destOf(it.c), g = GROUPS[it.g];
-  $('pop').innerHTML = `<span class="t" style="color:${g.col === '#e9bc00' ? '#8a6d00' : g.col}">${g.label} · ${esc(d.n)}</span><h3>${esc(it.n)}</h3>
-    <div class="row"><a class="btn primary" href="${esc(it.c)}/#${encodeURIComponent(it.id)}">Obre la fitxa ›</a><button id="popClose" class="small">Tanca</button></div>`;
+  $('pop').innerHTML = `<span class="t" style="color:${g.col === '#e9bc00' ? '#8a6d00' : g.col}">${g.label} · ${esc(short(d))}${it.m ? ' · ' + esc(it.m.split(', ')[0]) : ''}</span><h3>${esc(it.n)}</h3>
+    <div class="row"><a class="btn primary" href="${esc(it.c)}/#${it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei'}-${encodeURIComponent(it.id)}">Obre la fitxa ›</a><button id="popClose" class="small">Tanca</button></div>`;
   $('pop').hidden = false; $('cards').hidden = true; $('popClose').onclick = hidePop; draw(); remember();
 }
 function hidePop() { if (!popItem && $('pop').hidden) return; popItem = null; $('pop').hidden = true; $('cards').hidden = false; draw(); }
@@ -160,12 +163,15 @@ function hidePop() { if (!popItem && $('pop').hidden) return; popItem = null; $(
 /* ---------- search ---------- */
 function search(q) {
   const f = fold(q.trim()); if (f.length < 2) return [];
-  const words = f.split(/\s+/), hit = s => { const t = fold(s); return words.every(w => t.includes(w)); };
+  // a one-letter word («l» of «l'Escala», «d» of «d'Aro») matches almost anything: it counts only if it is alone
+  const all = f.split(/\s+/), words = all.some(w => w.length > 1) ? all.filter(w => w.length > 1) : all, hit = s => { const t = fold(s); return words.every(w => t.includes(w)); };
   const starts = s => fold(s).startsWith(words[0]) ? 0 : 1;
-  const towns = DATA.D.filter(d => hit(d.n)).map(d => ({d, rank: starts(d.n)}));
+  // a park is found by its name or by any of its municipalities («Torroella», «l'Escala»)
+  const towns = DATA.D.filter(d => hit(d.n + ' ' + (d.nc || '') + ' ' + (d.m || []).join(' '))).map(d => ({d, rank: starts(d.n) + (hit(d.n + ' ' + (d.nc || '')) ? 0 : 1),
+    via: hit(d.n + ' ' + (d.nc || '')) ? '' : (d.m || []).map(m => [m, words.filter(w => fold(m).includes(w)).join('').length]).sort((x, y) => y[1] - x[1]).filter(x => x[1])[0]?.[0]}));
   // a place matches by its name or by its name and its town together («ermita mataro»); the name alone ranks first
   // a place needs at least one word of its own name: the town alone does not list all its places
-  const items = DATA.I.filter(it => hit(it.n + ' ' + destOf(it.c).n) && words.some(w => fold(it.n).includes(w))).map(it => ({it, rank: starts(it.n) + (it.g === 'ruta' ? 0 : 0.5) + (hit(it.n) ? 0 : 2)}));
+  const items = DATA.I.filter(it => hit(it.n + ' ' + destOf(it.c).n + ' ' + (destOf(it.c).nc || '') + ' ' + (it.m || '')) && words.some(w => fold(it.n).includes(w))).map(it => ({it, rank: starts(it.n) + (it.g === 'ruta' ? 0 : 0.5) + (hit(it.n) ? 0 : 2)}));
   return [...towns.sort((a, b) => a.rank - b.rank), ...items.sort((a, b) => a.rank - b.rank || a.it.n.localeCompare(b.it.n, 'ca'))].slice(0, 40);
 }
 function renderResults() {
@@ -173,8 +179,8 @@ function renderResults() {
   if (q.trim().length < 2) { hideResults(); return; }
   const res = search(q);
   $('results').innerHTML = res.length ? res.map((r, k) => r.d
-    ? `<button class="res" data-k="${k}"><span class="pdot town"></span><span><b>${esc(r.d.n)}</b><small>Destí · ${r.d.nR} rutes</small></span></button>`
-    : `<button class="res" data-k="${k}"><span class="pdot" style="background:${GROUPS[r.it.g].col}"></span><span><b>${esc(r.it.n)}</b><small>${GROUPS[r.it.g].label} · ${esc(destOf(r.it.c).n)}</small></span></button>`).join('')
+    ? `<button class="res" data-k="${k}"><span class="pdot town"></span><span><b>${esc(r.d.n)}</b><small>${r.d.parc ? 'Parc' : 'Destí'} · ${r.d.nR} rutes${r.via ? ' · inclou ' + esc(r.via) : ''}</small></span></button>`
+    : `<button class="res" data-k="${k}"><span class="pdot" style="background:${GROUPS[r.it.g].col}"></span><span><b>${esc(r.it.n)}</b><small>${GROUPS[r.it.g].label} · ${esc(short(destOf(r.it.c)))}${r.it.m ? ' · ' + esc(r.it.m.split(', ')[0]) : ''}</small></span></button>`).join('')
     : '<p class="none">No hi ha res amb aquest nom en aquests destins.</p>';
   $('results').hidden = false;
   $('results').querySelectorAll('.res').forEach(b => b.onclick = () => {

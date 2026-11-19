@@ -20,5 +20,7 @@
 .pcard .txt{display:flex;flex-direction:column;gap:2px;min-width:0}
 .pcard h2{margin:0;font-size:1.1rem}
 .pcard p{margin:0;font-size:.82rem;color:var(--muted)}
+.pcard p.muns{font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pcard .open{margin-top:auto;font-weight:800;color:var(--link,#4f6f09);text-decoration:none;padding:6px 0}
 .toast .row{display:flex;gap:8px;align-items:center}
+.attr a{color:inherit}

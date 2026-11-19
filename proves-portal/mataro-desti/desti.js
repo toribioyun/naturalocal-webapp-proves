@@ -43,7 +43,7 @@ function drawIcon(name, cx, cy, size, col) { // centred on (cx, cy)
   ctx.restore();
 }
 const CAT_NAME = {arquitectura: 'Arquitectura', paisatges: 'Paisatge', indrets: 'Indret', medi: 'Medi', museus: 'Museu', altres: 'Indret',
-  menjar: 'Menjar', dormir: 'Dormir', 'producte-local': 'Producte local', 'lleure-actiu': 'Lleure actiu'};
+  menjar: 'Menjar', dormir: 'Dormir', 'producte-local': 'Producte local', 'lleure-actiu': 'Lleure actiu', geologia: 'Geologia', 'festes-populars': 'Festa popular'};
 const NEAR_TRACK = 40; // progress keeps counting up to here (a GPS jump must not stop it)
 const OFFROUTE_M = 30; // «Fora de la ruta» beyond 30 m in every web app (D-134, 17/11/2026)
 let D = null, ITEMS = [], filter = 'tot';
@@ -161,7 +161,7 @@ function openSheet(i) {
   const it = ITEMS[i];
   gallery($('shGal'), it.pics);
   setDots($('shDots'), it.pics.length);
-  $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}`;
+  $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}${it.mun ? ' · ' + esc([...new Set([it.mun, ...(it.muns || [])])].slice(0, 3).join(', ')) : ''}`;
   $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [it.x, it.y])) + ' de tu' : '';
   $('shTitle').textContent = it.n;
   const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada a peu', it.dur], ['Durada en bici', it.durBici], ['Desnivell', it.des], ['Dificultat', it.dif], ['Dificultat en bici', it.difBici !== it.dif && it.difBici], ['Tipologia', it.tip], ['Temàtica', it.tema]].filter(f => f[1]) : [];
@@ -173,8 +173,10 @@ function openSheet(i) {
   else if (it.g === 'ruta') acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
   if (it.tel) acts.push(`<a class="btn" href="tel:${esc(it.tel)}">📞 Truca</a>`);
   acts.push(`<button id="aMap">Veure al mapa</button>`);
+  acts.push(`<button id="aShare">Comparteix</button>`);
   if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Veure la fitxa a Natura Local ↗</a>`);
   $('shActions').innerHTML = acts.join('');
+  $('aShare').onclick = () => share(it, $('aShare'));
   if ($('aNav')) $('aNav').onclick = () => { closeSheet(); startNav(it); };
   $('shActions').querySelectorAll('a[href^="rutes/"]').forEach(a => { a.onclick = rememberView; });
   $('aMap').onclick = () => { closeSheet(); showOnMap(it); };
@@ -206,15 +208,37 @@ $('shBody').addEventListener('click', e => {
 // Going into a route app and back: same sheet, same tab and same filter as when leaving.
 const HERE = location.pathname.split('/').filter(s => s && !s.endsWith('.html')).pop(); // this destination's folder
 function rememberView() { try { sessionStorage.setItem('tpnl-desti-vista', JSON.stringify({c: HERE, guia: !$('vGuia').hidden, filter})); } catch (e) {} }
+/* ---------- sharing (O-042, 18/11/2026): a link to any route, visit or service ----------
+   The link is fitxa/<kind>-<id>/ of this destination: a small page built by genera.py with the title, photo and text
+   (for the preview in WhatsApp and social networks), which opens this app on that sheet (#<kind>-<id>).
+   The kind in the link (ruta, visita, servei) avoids mixing a route and a place with the same number. */
+const kindOf = it => it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei';
+const keyOf = it => kindOf(it) + '-' + it.id;
+const shareUrl = it => new URL('fitxa/' + keyOf(it) + '/', new URL('./', location.href)).href;
+async function share(it, btn) {
+  const url = shareUrl(it);
+  if (navigator.share) { try { await navigator.share({title: it.n, text: it.n + ' · Natura Local', url}); } catch (e) {} return; }
+  let ok = false;
+  try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {
+    const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select();
+    try { ok = document.execCommand('copy'); } catch (e2) {} t.remove();
+  }
+  const old = btn.textContent; btn.textContent = ok ? 'Enllaç copiat ✓' : url; setTimeout(() => { btn.textContent = old; }, ok ? 2000 : 8000);
+}
+function fromHash(h) { // #ruta-123, #visita-123, #servei-123; and the old #123 (route first), still used by the route apps
+  const m = /^(ruta|visita|servei)-(.+)$/.exec(h);
+  if (m) return ITEMS.find(i => kindOf(i) === m[1] && String(i.id) === m[2]);
+  return ITEMS.find(i => i.g === 'ruta' && String(i.id) === h) || ITEMS.find(i => String(i.id) === h);
+}
 function restoreView() {
-  const id = location.hash.slice(1); if (!id) return;
+  const id = decodeURIComponent(location.hash.slice(1)); if (!id) return;
   history.replaceState(null, '', location.pathname + location.search);
   let v = null; try { v = JSON.parse(sessionStorage.getItem('tpnl-desti-vista')); } catch (e) {}
   if (v && v.c !== HERE) v = null; // the view kept by another destination
   if (v && v.filter && (v.filter === 'tot' || ITEMS.some(i => i.g === v.filter))) { filter = v.filter; renderChips(); renderGuide(); draw(); }
   if (v && v.guia) showTab(false);
   // a route back from its app, or any place chosen in the portal's search (../#id)
-  const it = ITEMS.find(i => i.g === 'ruta' && String(i.id) === id) || ITEMS.find(i => String(i.id) === id);
+  const it = fromHash(id);
   if (it) openSheet(it.i);
 }
 /* ---------- portal (O-033): way back to every destination, and the nearest ones ---------- */
@@ -232,7 +256,7 @@ async function portalLinks() {
   const km = d => Math.hypot((d.lon - LON0) * KX, (d.lat - LAT0) * KY);
   const near = list.filter(d => d.c !== here).sort((a, b) => km(a) - km(b)).slice(0, 3);
   if (!near.length) return;
-  $('nearDest').innerHTML = `<h2 class="gsec">Altres destins a prop</h2><ul class="cards">${near.map(d => `<li><a class="cardlink" href="../${esc(d.c)}/">${d.foto ? `<img src="../${esc(d.c)}/${esc(d.foto)}" alt="" loading="lazy">` : ''}<span><small>Destí · a ${fmtM(km(d))}</small><b>${esc(d.n)}</b><span class="sub">${d.nR} rutes · ${d.nV} visites</span></span><span class="chev">›</span></a></li>`).join('')}</ul>`;
+  $('nearDest').innerHTML = `<h2 class="gsec">Altres destins a prop</h2><ul class="cards">${near.map(d => `<li><a class="cardlink" href="../${esc(d.c)}/">${d.foto ? `<img src="../${esc(d.c)}/${esc(d.foto)}" alt="" loading="lazy">` : ''}<span><small>${d.parc ? 'Parc' : 'Destí'} · a ${fmtM(km(d))}</small><b>${esc(d.n)}</b><span class="sub">${d.nR} rutes · ${d.nV} visites</span></span><span class="chev">›</span></a></li>`).join('')}</ul>`;
   $('nearDest').hidden = false;
 }
 $('shClose').onclick = closeSheet;
