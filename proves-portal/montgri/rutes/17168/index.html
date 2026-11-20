@@ -46,23 +46,28 @@
     <p class="cta-note">«Prova-la des de casa» camina sola pel recorregut: veuràs com es mou el mapa i els avisos en arribar a cada punt.</p>
     <p class="cta-note">Amb cobertura no cal descarregar res (gasta <span class="mbOnline">uns 8 MB</span> de dades). Si la perds a mig camí, el mapa, el GPS i els avisos continuen funcionant.</p>
 
+    <!-- The download state only: the button is the one above (Juanjo, 20/11/2026: no second «Descarrega» button) -->
     <div class="box" id="offBox">
       <div class="box-head">
-        <strong>Vas a un lloc sense cobertura?</strong>
+        <strong>Sense cobertura</strong>
         <span id="offState" class="pill info">Comprovant…</span>
       </div>
-      <p class="muted">Descarrega-la ara, amb connexió, i la podràs fer tota en mode avió: mapa, ortofoto, fotos, àudios i vídeos.</p>
+      <p class="muted">Si la descarregues, la podràs fer tota en mode avió: mapa, ortofoto, fotos, àudios i vídeos.</p>
       <p id="offText" hidden></p>
       <div class="bar"><i id="offBar"></i></div>
-      <div class="row">
-        <button id="dlBtn">Descarrega la ruta</button>
-        <button id="installBtn" hidden>Instal·la l'app</button>
-      </div>
-      <p id="iosHint" class="hint" hidden>A l'iPhone: botó <b>Compartir</b> → <b>Afegeix a la pantalla d'inici</b>. Obre-la sempre des de la icona; si no, l'iPhone pot esborrar la descàrrega.</p>
+      <button id="dlBtn" hidden>Descarrega la ruta</button>
     </div>
 
     <h2 class="sec">Què hi ha?</h2>
     <ol class="poilist" id="poiList"></ol>
+
+    <!-- Install: its own box, apart from the download, and only where the browser offers it (Juanjo, 20/11/2026) -->
+    <div class="box" id="instBox" hidden>
+      <div class="box-head"><strong>Tenir-la a la pantalla d'inici</strong></div>
+      <p class="muted">Afegeix aquesta ruta a la pantalla d'inici del mòbil i l'obriràs amb una icona, com una app. No cal: també funciona des del navegador.</p>
+      <div class="row"><button id="installBtn" hidden>Afegeix-la a la pantalla d'inici</button></div>
+      <p id="iosHint" class="hint" hidden>A l'iPhone: botó <b>Compartir</b> → <b>Afegeix a la pantalla d'inici</b>. Obre-la sempre des de la icona; si no, l'iPhone pot esborrar la descàrrega.</p>
+    </div>
 
     <details class="diag">
       <summary>Informe per a proves</summary>

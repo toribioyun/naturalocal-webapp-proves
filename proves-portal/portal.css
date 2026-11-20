@@ -26,3 +26,4 @@
 .attr a{color:inherit}
 .pmode{flex:none}
 .rcard h2{font-size:1rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pcards .none{background:var(--panel);border-radius:14px;box-shadow:0 4px 12px #0004;margin:0 auto;max-width:min(420px,90vw)}

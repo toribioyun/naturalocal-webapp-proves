@@ -126,6 +126,18 @@ $('tMapa').onclick = () => showTab(true); $('tGuia').onclick = () => showTab(fal
 /* ---------- guide ---------- */
 // Dots under a gallery: one per photo, the current one longer, so it is clear that you can swipe (Toribio, 11/11/2026).
 function setDots(el, n) { el.hidden = n < 2; el.innerHTML = '<i class="on"></i>' + '<i></i>'.repeat(Math.max(0, n - 1)); }
+// Arrows for a mouse (only shown with a fine pointer, style.css .garr): one photo back or forward
+function arrows(g, n) {
+  const box = g.parentElement;
+  let a = box.querySelectorAll(':scope > .garr');
+  if (!a.length) {
+    box.insertAdjacentHTML('beforeend', '<button class="garr prev" aria-label="Foto anterior">‹</button><button class="garr next" aria-label="Foto següent">›</button>');
+    a = box.querySelectorAll(':scope > .garr');
+    a[0].onclick = e => { e.stopPropagation(); g.scrollBy({left: -g.clientWidth, behavior: 'smooth'}); };
+    a[1].onclick = e => { e.stopPropagation(); g.scrollBy({left: g.clientWidth, behavior: 'smooth'}); };
+  }
+  a.forEach(b => b.hidden = n < 2);
+}
 function moveDots(el, g) { const k = Math.round(g.scrollLeft / (g.clientWidth || 1)); el.querySelectorAll('i').forEach((x, j) => x.classList.toggle('on', j === k)); }
 function gallery(el, pics) { el.innerHTML = pics.map(([f, c]) => `<img src="${f}" alt="${esc(c)}" loading="lazy">`).join(''); el.scrollLeft = 0; }
 function renderGuide() {
@@ -176,7 +188,7 @@ $('guide').onclick = e => {
 function openSheet(i) {
   const it = ITEMS[i];
   gallery($('shGal'), it.pics);
-  setDots($('shDots'), it.pics.length);
+  setDots($('shDots'), it.pics.length); arrows($('shGal'), it.pics.length);
   $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}${it.mun ? ' · ' + esc([...new Set([it.mun, ...(it.muns || [])])].slice(0, 3).join(', ')) : ''}`;
   $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [it.x, it.y])) + ' de tu' : '';
   $('shTitle').textContent = it.n;
@@ -474,7 +486,7 @@ function simulate() {
   prepare(); for (const it of ITEMS) byName[it.n] = it;
   setLayer('osm');
   $('dName').textContent = D.D.nom; document.title = 'Natura Local · ' + D.D.nom;
-  gallery($('dGal'), D.D.pics); setDots($('dDots'), D.D.pics.length);
+  gallery($('dGal'), D.D.pics); setDots($('dDots'), D.D.pics.length); arrows($('dGal'), D.D.pics.length);
   renderChips(); renderGuide();
   resize(); fitAll();
   restoreView();

@@ -69,7 +69,7 @@ function label(text, sx, sy, bold) {
 }
 const showItems = () => view.z >= ITEMS_FROM_Z;
 function paint() {
-  dirty = false; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  dirty = false; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); syncCards();
   ctx.fillStyle = '#e8e2d2'; ctx.fillRect(0, 0, W, H);
   paintTiles();
   if (mode === 'rut') { paintRoutes(); return; }
@@ -153,13 +153,23 @@ function tapAt(x, y) {
 }
 
 /* ---------- destinations, cards and pop-up ---------- */
+// The cards show only what is on the visible part of the map, above the cards (Juanjo, 20/11/2026): zooming in or
+// moving the map leaves fewer cards. They are drawn again only when that set changes, so a swipe is not lost.
+let cardH = 0, cardKey = null, cardTimer = 0;
+function inView(lat, lon) {
+  const [x, y] = ll2s(lat, lon); cardH = Math.max(cardH, $('cards').offsetHeight); // the tallest: a short «none» line must not widen the area and loop
+  return x >= 0 && x <= W && y >= 0 && y <= H - cardH;
+}
+function syncCards() { clearTimeout(cardTimer); cardTimer = setTimeout(() => { if (W && cardsKey() !== cardKey) renderCards(); }, 150); }
+const cardsKey = () => mode + '|' + (mode === 'rut' ? routes().filter(i => inView(i.lat, i.lon)).map(i => i.c + '/' + i.id) : DATA.D.filter(d => inView(d.lat, d.lon)).map(d => d.c)).join(',') + '|' + !!me;
+const OUTSIDE = what => `<p class="none">Cap ${what} en aquesta part del mapa. Allunya'l o mou-lo per veure'n més.</p>`;
 const destOf = c => DATA.D.find(d => d.c === c);
 const short = d => d.nc || d.n; // a park has a long name: «Montgrí» in labels and buttons
 const fmtKm = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 1 : 0).replace('.', ',') + ' km';
 function km(a, b) { const R = 6371000, r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r; const h = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); }
 const MODE_NAME = {peu: 'A peu', bici: 'En bici', cavall: 'A cavall'};
 function renderRouteCards() {
-  const list = routes();
+  const all = routes(), list = all.filter(i => inView(i.lat, i.lon));
   if (me) list.sort((a, b) => km(me, [a.lat, a.lon]) - km(me, [b.lat, b.lon])); else list.sort((a, b) => a.n.localeCompare(b.n, 'ca'));
   $('cards').innerHTML = list.length ? list.map(it => `<article class="pcard rcard" data-k="${esc(it.c + '/' + it.id)}">
     ${it.f ? `<img src="${esc(it.c)}/${esc(it.f)}" alt="" loading="lazy">` : ''}
@@ -167,7 +177,7 @@ function renderRouteCards() {
       <p>${[MODE_NAME[it.mo], it.km && it.km + ' km', it.df, it.tp].filter(Boolean).map(esc).join(' · ')}${me ? ` · <b>a ${fmtKm(km(me, [it.lat, it.lon]))}</b>` : ''}</p>
       <p class="muns">${esc(short(destOf(it.c)))}${it.m ? ' · ' + esc(it.m.split(', ')[0]) : ''}</p>
       <a class="open" href="${esc(it.c)}/#ruta-${encodeURIComponent(it.id)}">Obre la fitxa ›</a></div></article>`).join('')
-    : '<p class="none">Cap ruta amb aquests filtres.</p>';
+    : all.length ? OUTSIDE('ruta') : '<p class="none">Cap ruta amb aquests filtres.</p>';
   $('cards').querySelectorAll('.rcard').forEach(el => el.onclick = e => {
     if (e.target.closest('a')) return;
     const it = DATA.I.find(i => i.g === 'ruta' && i.c + '/' + i.id === el.dataset.k); showPop(it); flyTo(it.lat, it.lon, Math.max(view.z, 13));
@@ -185,16 +195,18 @@ $('mDest').onclick = () => setMode('dest', true);
 $('mRut').onclick = () => setMode('rut', true);
 $('fBtn').onclick = () => RF.open(DATA.I.filter(i => i.g === 'ruta'), () => setMode('rut', true));
 function renderCards() {
+  cardKey = cardsKey();
   if (mode === 'rut') { renderRouteCards(); return; }
-  const list = [...DATA.D];
+  const list = DATA.D.filter(d => inView(d.lat, d.lon));
   if (me) list.sort((a, b) => km(me, [a.lat, a.lon]) - km(me, [b.lat, b.lon])); else list.sort((a, b) => a.n.localeCompare(b.n, 'ca'));
   $('cards').innerHTML = list.map(d => `<article class="pcard${d === sel ? ' on' : ''}" data-c="${esc(d.c)}">
     <img src="${esc(d.c)}/${esc(d.foto)}" alt="" loading="lazy">
     <div class="txt"><h2>${esc(d.n)}</h2>
       <p>${[d.nR && `${d.nR} ${d.nR === 1 ? 'ruta' : 'rutes'}`, d.nV && `${d.nV} ${d.nV === 1 ? 'visita' : 'visites'}`, d.nS && `${d.nS} serveis`].filter(Boolean).join(' · ')}${me ? ` · <b>a ${fmtKm(km(me, [d.lat, d.lon]))}</b>` : ''}</p>
       ${d.parc ? `<p class="muns">Parc · ${d.m.length} municipis: ${esc(d.m.slice(0, 3).join(', '))}${d.m.length > 3 ? '…' : ''}</p>` : ''}
-      <a class="open" href="${esc(d.c)}/">Obre ${esc(short(d))} ›</a></div></article>`).join('');
+      <a class="open" href="${esc(d.c)}/">Obre ${esc(short(d))} ›</a></div></article>`).join('') || OUTSIDE('destí');
   $('cards').querySelectorAll('.pcard').forEach(el => el.onclick = e => { if (e.target.closest('a')) return; selectDest(destOf(el.dataset.c), false); });
+  if (sel) { const el = $('cards').querySelector(`[data-c="${CSS.escape(sel.c)}"]`); if (el) el.scrollIntoView({inline: 'center', block: 'nearest'}); }
 }
 function selectDest(d, scrollCard) {
   sel = d; hidePop();

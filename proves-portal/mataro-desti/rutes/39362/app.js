@@ -47,13 +47,13 @@ document.addEventListener('error', e => {
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installEvt = null;
-addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('installBtn').hidden = false; });
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('installBtn').hidden = false; $('instBox').hidden = false; });
 $('installBtn').onclick = async () => {
   if (!installEvt) return;
   installEvt.prompt(); const r = await installEvt.userChoice; log('Instal·lació: ' + r.outcome);
-  installEvt = null; $('installBtn').hidden = true;
+  installEvt = null; $('installBtn').hidden = true; $('instBox').hidden = true;
 };
-if (isIOS && !standalone) $('iosHint').hidden = false;
+if (isIOS && !standalone) { $('iosHint').hidden = false; $('instBox').hidden = false; }
 log('Mode app instal·lada: ' + (standalone ? 'sí' : 'no'));
 
 if ('serviceWorker' in navigator) {
@@ -188,6 +188,7 @@ async function checkOffline() {
   if (have === files.length) {
     setOff(true, 'Tot guardat al mòbil: ja pots posar el mode avió.');
     $('dlBtn').textContent = 'Torna a descarregar';
+    $('offBox').querySelector('.muted').hidden = true;
     setBig('✓ Descarregada: la pots fer sense cobertura', true);
   } else if (!navigator.onLine) {
     setOff(false, `Ara no tens connexió. Pots fer la ruta igualment, però sense les fotos, els àudios, els vídeos i l'ortofoto que no tens guardats.`);
