@@ -120,7 +120,7 @@ function fit(pts, pad = 50, maxZ = 15) {
   const xs = pts.map(p => mx(p[1])), ys = pts.map(p => my(p[0]));
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   view.x = (x0 + x1) / 2; view.y = (y0 + y1) / 2;
-  const bottom = $('cards').offsetHeight || 0;
+  const bottom = Math.max($('cards').offsetHeight, cardH, 150); // the cards grow when the fonts and photos arrive
   view.z = Math.min(maxZ, Math.log2(Math.min((W - 2 * pad) / Math.max(x1 - x0, 1e-9), (H - bottom - 2 * pad) / Math.max(y1 - y0, 1e-9))));
   view.y += bottom / 2 / scale(); // keep the points above the cards
   draw();
@@ -157,8 +157,9 @@ function tapAt(x, y) {
 // moving the map leaves fewer cards. They are drawn again only when that set changes, so a swipe is not lost.
 let cardH = 0, cardKey = null, cardTimer = 0;
 function inView(lat, lon) {
+  if (!W) return true; // before the map has a size (the first cards, which the first fit needs to measure)
   const [x, y] = ll2s(lat, lon); cardH = Math.max(cardH, $('cards').offsetHeight); // the tallest: a short «none» line must not widen the area and loop
-  return x >= 0 && x <= W && y >= 0 && y <= H - cardH;
+  return x >= 0 && x <= W && y >= 0 && y <= H - cardH + 30; // a pin whose tip just touches the cards still shows
 }
 function syncCards() { clearTimeout(cardTimer); cardTimer = setTimeout(() => { if (W && cardsKey() !== cardKey) renderCards(); }, 150); }
 const cardsKey = () => mode + '|' + (mode === 'rut' ? routes().filter(i => inView(i.lat, i.lon)).map(i => i.c + '/' + i.id) : DATA.D.filter(d => inView(d.lat, d.lon)).map(d => d.c)).join(',') + '|' + !!me;

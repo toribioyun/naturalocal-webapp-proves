@@ -1,7 +1,7 @@
 // Service worker of the portal (O-033). VERSION is set by portal/scripts/genera.py (hash of the app files).
 // It is at the root of the site, so its scope covers every destination: it only answers for the portal's own files,
 // and leaves the rest to each destination's and route's own worker (or to the network).
-const VERSION = '11caf8723d';
+const VERSION = 'eb74c7f27b';
 const SHELL = 'tpnlp-shell-' + VERSION, SEEN = 'tpnlp-vist';
 const SHELL_FILES = ['./', 'index.html', 'portal.js', 'portal.css', 'style.css', 'manifest.webmanifest', 'icones.js', 'filtre.js', 'icon-192.png', 'icon-512.png',
   'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2', 'fonts/raleway-latin-ext.woff2', 'cerca.json'];
