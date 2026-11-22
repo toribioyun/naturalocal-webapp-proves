@@ -189,7 +189,7 @@ function openSheet(i) {
   const it = ITEMS[i];
   gallery($('shGal'), it.pics);
   setDots($('shDots'), it.pics.length); arrows($('shGal'), it.pics.length);
-  $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}${it.mun ? ' · ' + esc([...new Set([it.mun, ...(it.muns || [])])].slice(0, 3).join(', ')) : ''}`;
+  $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span><span>${esc(catLabel(it))}</span>${it.mun ? ' · ' + esc([...new Set([it.mun, ...(it.muns || [])])].slice(0, 3).join(', ')) : ''}`;
   $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [it.x, it.y])) + ' de tu' : '';
   $('shTitle').textContent = it.n;
   const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada a peu', it.dur], ['Durada en bici', it.durBici], ['Desnivell', it.des], ['Dificultat', it.dif], ['Dificultat en bici', it.difBici !== it.dif && it.difBici], ['Tipologia', it.tip], ['Temàtica', it.tema]].filter(f => f[1]) : [];
@@ -201,10 +201,11 @@ function openSheet(i) {
   else if (it.g === 'ruta') acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
   if (it.tel) acts.push(`<a class="btn" href="tel:${esc(it.tel)}">📞 Truca</a>`);
   acts.push(`<button id="aMap">Veure al mapa</button>`);
-  acts.push(`<button id="aShare">Comparteix</button>`);
+  acts.push(`<button id="aFav"></button>`, `<button id="aShare">Comparteix</button>`);
   if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Veure la fitxa a Natura Local ↗</a>`);
   $('shActions').innerHTML = acts.join('');
   $('aShare').onclick = () => share(it.n, shareUrl(it), $('aShare'));
+  NLM.heart($('aFav'), favItem(it));
   if ($('aNav')) $('aNav').onclick = () => { closeSheet(); startNav(it); };
   $('shActions').querySelectorAll('a[href^="rutes/"]').forEach(a => { a.onclick = rememberView; });
   $('aMap').onclick = () => { closeSheet(); showOnMap(it); };
@@ -244,6 +245,9 @@ function rememberView() { try { sessionStorage.setItem('tpnl-desti-vista', JSON.
 const kindOf = it => it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei';
 const keyOf = it => kindOf(it) + '-' + it.id;
 const shareUrl = it => new URL('fitxa/' + keyOf(it) + '/', new URL('./', location.href)).href;
+// Favourites (O-066): what the ☰ menu keeps, with the paths from the root of the site (this folder is HERE)
+const favItem = it => ({k: HERE + '/' + keyOf(it), kind: kindOf(it), n: it.n, d: D.D.nom, foto: it.pics[0] ? HERE + '/' + it.pics[0][0] : '', lat: it.lat, lon: it.lon});
+const favDest = () => ({k: HERE + '/desti', kind: 'desti', n: D.D.nom, d: D.D.nom, foto: D.D.pics[0] ? HERE + '/' + D.D.pics[0][0] : '', lat: +D.D.lat || LAT0, lon: +D.D.lon || LON0});
 const destUrl = () => new URL('fitxa/desti/', new URL('./', location.href)).href; // the destination itself (Toribio, 22/11/2026)
 async function share(title, url, btn) {
   if (navigator.share) { try { await navigator.share({title, text: title + ' · Natura Local', url}); } catch (e) {} return; }
@@ -435,7 +439,7 @@ function showPop(it) {
   sel = it; const p = $('pop');
   const d = me ? ' · a ' + fmtM(dist([me.x, me.y], [it.x, it.y])) : '';
   const txt = it.g === 'ruta' ? [it.mo === 'bici' && 'En bici', it.km + ' km', it.mo === 'bici' ? it.durBici : it.dur, it.des, it.df || it.dif].filter(Boolean).join(' · ') : plain(it.desc[0] || '').slice(0, 140);
-  p.innerHTML = `<span class="t"><span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span>${esc(catLabel(it))}${d}</span><h3>${esc(it.n)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}
+  p.innerHTML = `<span class="t"><span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span><span>${esc(catLabel(it))}</span>${d}</span><h3>${esc(it.n)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}
     <div class="row"><button class="primary grow" id="pMore">Més informació ›</button>${it.app ? `<a class="btn" href="${it.app}">Navega</a>` : it.g === 'ruta' ? '<button id="pNav">Navega</button>' : ''}<button id="pClose" aria-label="Tanca">×</button></div>`;
   p.hidden = nav != null;
   $('pMore').onclick = () => openSheet(it.i);
@@ -499,6 +503,7 @@ function simulate() {
 }
 
 /* ---------- start ---------- */
+NLM.init({root: '../'}); // the ☰ menu (O-066): favourites, downloaded routes, settings
 (async function init() {
   updateNet();
   try { D = await fetch('data.json').then(r => r.json()); }
@@ -508,6 +513,7 @@ function simulate() {
   $('dName').textContent = D.D.nom; document.title = 'Natura Local · ' + D.D.nom;
   gallery($('dGal'), D.D.pics); setDots($('dDots'), D.D.pics.length); arrows($('dGal'), D.D.pics.length);
   $('dShare').onclick = () => share(D.D.nom, destUrl(), $('dShare'));
+  NLM.heart($('dFav'), favDest);
   renderChips(); renderGuide();
   resize(); fitAll();
   restoreView();

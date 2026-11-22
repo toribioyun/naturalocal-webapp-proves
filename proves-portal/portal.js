@@ -73,6 +73,7 @@ function paint() {
   ctx.fillStyle = '#e8e2d2'; ctx.fillRect(0, 0, W, H);
   paintTiles();
   if (mode === 'rut') { paintRoutes(); return; }
+  if (mode === 'fav') { paintFavs(); return; }
   if (showItems()) {
     ctx.lineJoin = ctx.lineCap = 'round';
     for (const t of DATA.T) {
@@ -116,6 +117,42 @@ function paintRoutes() { // «Rutes»: the routes that pass the filter, at any z
   if (popItem) { const [x, y] = ll2s(popItem.lat, popItem.lon); pin(x, y, '#e8590c', 13); ctx.beginPath(); ctx.arc(x, y - 23.4, 5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); }
   if (me) { const [x, y] = ll2s(me[0], me[1]); ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fillStyle = '#1b6ca8'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke(); }
 }
+/* ---------- favourites (O-066): what was kept with ♡ in any app, on the map and in the cards ---------- */
+const FAV_COL = {desti: '#322820', ruta: '#69920c', visita: '#e9bc00', servei: '#1f6f8b'};
+const favList = () => NLM.favs().filter(f => isFinite(f.lat) && isFinite(f.lon));
+function paintFavs() {
+  for (const d of DATA.D) { const [x, y] = ll2s(d.lat, d.lon); label(short(d), x, y + 4, false); }
+  for (const f of favList()) {
+    if (popItem && f.k === popItem.k) continue;
+    const [x, y] = ll2s(f.lat, f.lon); if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue;
+    pin(x, y, FAV_COL[f.kind] || '#c2185b', f.kind === 'desti' ? 10 : 8);
+    ctx.beginPath(); ctx.arc(x, y - (f.kind === 'desti' ? 18 : 14.4), 3.6, 0, 7); ctx.fillStyle = '#c2185b'; ctx.fill();
+  }
+  if (popItem) { const [x, y] = ll2s(popItem.lat, popItem.lon); pin(x, y, '#e8590c', 13); ctx.beginPath(); ctx.arc(x, y - 23.4, 5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); }
+  if (me) { const [x, y] = ll2s(me[0], me[1]); ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fillStyle = '#1b6ca8'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+}
+const favHref = f => f.kind === 'desti' ? f.k.split('/')[0] + '/' : f.k.replace('/', '/#');
+const KIND_NAME = {desti: 'Destí', ruta: 'Ruta', visita: 'Visita', servei: 'Servei'};
+function renderFavCards() {
+  const all = favList(), list = all.filter(f => inView(f.lat, f.lon));
+  $('cards').innerHTML = list.length ? list.map(f => `<article class="pcard rcard" data-fk="${esc(f.k)}">
+    ${f.foto ? `<img src="${esc(f.foto)}" alt="" loading="lazy">` : ''}
+    <div class="txt"><h2>${esc(f.n)}</h2><p>${KIND_NAME[f.kind]}${f.kind !== 'desti' && f.d ? ' · ' + esc(f.d) : ''}</p>
+      <a class="open" href="${esc(favHref(f))}">Obre la fitxa ›</a></div></article>`).join('')
+    : all.length ? OUTSIDE('favorit') : '<p class="none">Encara no tens cap favorit.</p>';
+  $('cards').querySelectorAll('[data-fk]').forEach(el => el.onclick = e => {
+    if (e.target.closest('a')) return;
+    const f = favList().find(x => x.k === el.dataset.fk); showFavPop(f); flyTo(f.lat, f.lon, Math.max(view.z, 13));
+  });
+}
+function showFavPop(f) {
+  popItem = f;
+  $('pop').innerHTML = `<span class="t" style="color:#c2185b">♥ ${KIND_NAME[f.kind]}${f.kind !== 'desti' && f.d ? ' · ' + esc(f.d) : ''}</span><h3>${esc(f.n)}</h3>
+    <div class="row"><a class="btn primary" href="${esc(favHref(f))}">Obre la fitxa ›</a><button id="popClose" class="small">Tanca</button></div>`;
+  $('pop').hidden = false; $('cards').hidden = true; $('popClose').onclick = hidePop; draw();
+}
+function syncFavChip() { $('mFav').hidden = !NLM.favs().length && mode !== 'fav'; }
+addEventListener('tpnlfav', () => { syncFavChip(); if (mode === 'fav') { renderCards(); draw(); } });
 function fit(pts, pad = 50, maxZ = 15) {
   const xs = pts.map(p => mx(p[1])), ys = pts.map(p => my(p[0]));
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
@@ -145,6 +182,7 @@ function tapAt(x, y) {
   hideResults();
   let best = null, bd = 30;
   const near = (lat, lon, dy, obj) => { const [sx, sy] = ll2s(lat, lon), d = Math.hypot(sx - x, sy - dy - y); if (d < bd) { bd = d; best = obj; } };
+  if (mode === 'fav') { favList().forEach(f => near(f.lat, f.lon, 12, f)); if (best) showFavPop(best); else hidePop(); return; }
   if (mode === 'rut') routes().forEach(it => near(it.lat, it.lon, 12, it));
   else if (showItems()) DATA.I.forEach(it => near(it.lat, it.lon, it.g === 'ruta' ? 12 : 0, it));
   else DATA.D.forEach(d => near(d.lat, d.lon, 18, d));
@@ -162,7 +200,7 @@ function inView(lat, lon) {
   return x >= 0 && x <= W && y >= 0 && y <= H - cardH + 30; // a pin whose tip just touches the cards still shows
 }
 function syncCards() { clearTimeout(cardTimer); cardTimer = setTimeout(() => { if (W && cardsKey() !== cardKey) renderCards(); }, 150); }
-const cardsKey = () => mode + '|' + (mode === 'rut' ? routes().filter(i => inView(i.lat, i.lon)).map(i => i.c + '/' + i.id) : DATA.D.filter(d => inView(d.lat, d.lon)).map(d => d.c)).join(',') + '|' + !!me;
+const cardsKey = () => mode + '|' + (mode === 'fav' ? favList().filter(f => inView(f.lat, f.lon)).map(f => f.k) : mode === 'rut' ? routes().filter(i => inView(i.lat, i.lon)).map(i => i.c + '/' + i.id) : DATA.D.filter(d => inView(d.lat, d.lon)).map(d => d.c)).join(',') + '|' + !!me;
 const OUTSIDE = what => `<p class="none">Cap ${what} en aquesta part del mapa. Allunya'l o mou-lo per veure'n més.</p>`;
 const destOf = c => DATA.D.find(d => d.c === c);
 const short = d => d.nc || d.n; // a park has a long name: «Montgrí» in labels and buttons
@@ -185,19 +223,21 @@ function renderRouteCards() {
   });
 }
 function setMode(m, refit) {
-  mode = m; $('mDest').setAttribute('aria-pressed', m === 'dest'); $('mRut').setAttribute('aria-pressed', m === 'rut');
+  mode = m; $('mDest').setAttribute('aria-pressed', m === 'dest'); $('mRut').setAttribute('aria-pressed', m === 'rut'); $('mFav').setAttribute('aria-pressed', m === 'fav'); syncFavChip();
   $('fBtn').hidden = m !== 'rut'; $('fBtn').innerHTML = FUNNEL + RF.label(); $('fBtn').setAttribute('aria-pressed', RF.count() > 0);
   hidePop(); renderCards();
-  if (refit) { const pts = m === 'rut' ? routes().map(i => [i.lat, i.lon]) : DATA.D.map(d => [d.lat, d.lon]); if (pts.length) fit(pts, 60, 12); }
+  if (refit) { const pts = m === 'fav' ? favList().map(f => [f.lat, f.lon]) : m === 'rut' ? routes().map(i => [i.lat, i.lon]) : DATA.D.map(d => [d.lat, d.lon]); if (pts.length) fit(pts, 60, m === 'fav' ? 14 : 12); }
   draw(); remember();
 }
 const FUNNEL = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><path d="M3 5h18l-7 8v6l-4 2v-8z" fill="currentColor"/></svg>';
 $('mDest').onclick = () => setMode('dest', true);
 $('mRut').onclick = () => setMode('rut', true);
+$('mFav').onclick = () => setMode('fav', true);
 $('fBtn').onclick = () => RF.open(DATA.I.filter(i => i.g === 'ruta'), () => setMode('rut', true));
 function renderCards() {
   cardKey = cardsKey();
   if (mode === 'rut') { renderRouteCards(); return; }
+  if (mode === 'fav') { renderFavCards(); return; }
   const list = DATA.D.filter(d => inView(d.lat, d.lon));
   if (me) list.sort((a, b) => km(me, [a.lat, a.lon]) - km(me, [b.lat, b.lon])); else list.sort((a, b) => a.n.localeCompare(b.n, 'ca'));
   $('cards').innerHTML = list.map(d => `<article class="pcard${d === sel ? ' on' : ''}" data-c="${esc(d.c)}">
@@ -217,9 +257,11 @@ function selectDest(d, scrollCard) {
 }
 function showPop(it) {
   popItem = it; const d = destOf(it.c), g = GROUPS[it.g];
-  $('pop').innerHTML = `<span class="t" style="color:${g.col === '#e9bc00' ? '#8a6d00' : g.col}">${g.label} · ${esc(short(d))}${it.m ? ' · ' + esc(it.m.split(', ')[0]) : ''}</span><h3>${esc(it.n)}</h3>
-    <div class="row"><a class="btn primary" href="${esc(it.c)}/#${it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei'}-${encodeURIComponent(it.id)}">Obre la fitxa ›</a><button id="popClose" class="small">Tanca</button></div>`;
+  $('pop').innerHTML = `<span class="t" style="color:${g.col === '#e9bc00' ? '#8a6d00' : g.col}"><span>${g.label}</span> · ${esc(short(d))}${it.m ? ' · ' + esc(it.m.split(', ')[0]) : ''}</span><h3>${esc(it.n)}</h3>
+    <div class="row"><a class="btn primary" href="${esc(it.c)}/#${it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei'}-${encodeURIComponent(it.id)}">Obre la fitxa ›</a><button id="popFav" class="small"></button><button id="popClose" class="small">Tanca</button></div>`;
   $('pop').hidden = false; $('cards').hidden = true; $('popClose').onclick = hidePop; draw(); remember();
+  const kind = it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei';
+  NLM.heart($('popFav'), {k: it.c + '/' + kind + '-' + it.id, kind, n: it.n, d: short(d), foto: it.f ? it.c + '/' + it.f : '', lat: it.lat, lon: it.lon});
 }
 function hidePop() { if (!popItem && $('pop').hidden) return; popItem = null; $('pop').hidden = true; $('cards').hidden = false; draw(); }
 
@@ -271,13 +313,16 @@ $('meBtn').onclick = () => {
 /* ---------- start: back from a destination returns to the same view ---------- */
 function remember() { try { sessionStorage.setItem('tpnl-portal-vista', JSON.stringify({x: view.x, y: view.y, z: view.z, sel: sel && sel.c, q: $('q').value, mode})); } catch (e) {} }
 addEventListener('pagehide', remember);
+NLM.init({root: './', onFavMap: () => setMode('fav', true)}); // the ☰ menu (O-066)
 async function start() {
   updateNet(); resize();
   try { DATA = await (await fetch('cerca.json')).json(); } catch (e) { $('cards').innerHTML = '<p class="none">No s’han pogut carregar els destins. Torna-ho a provar amb connexió.</p>'; return; }
   TRK = new Map(DATA.T.map(t => [t.c + '/' + t.id, t]));
   renderCards();
   let v = null; try { v = JSON.parse(sessionStorage.getItem('tpnl-portal-vista')); } catch (e) {}
-  if (v && isFinite(v.z)) { Object.assign(view, {x: v.x, y: v.y, z: v.z}); sel = v.sel ? destOf(v.sel) || null : null; if (v.mode === 'rut') setMode('rut', false); else renderCards(); if (v.q) { $('q').value = v.q; $('qClear').hidden = false; } draw(); }
+  syncFavChip();
+  if (location.hash === '#favorits') { history.replaceState(null, '', location.pathname + location.search); setMode('fav', true); return; }
+  if (v && isFinite(v.z)) { Object.assign(view, {x: v.x, y: v.y, z: v.z}); sel = v.sel ? destOf(v.sel) || null : null; if (v.mode === 'rut' || (v.mode === 'fav' && NLM.favs().length)) setMode(v.mode, false); else renderCards(); if (v.q) { $('q').value = v.q; $('qClear').hidden = false; } draw(); }
   else fit(DATA.D.map(d => [d.lat, d.lon]), 60, 11);
 }
 start();

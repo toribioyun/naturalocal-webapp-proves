@@ -2,10 +2,10 @@
 // Cache-first for everything in this folder. VERSION is set by portal/scripts/genera.py (hash of the app files).
 // App, data and map are always saved; media and ortho tiles (zoom ≤ 17) opened online are saved too
 // (nl-rutes), so the route keeps working if coverage is lost without having downloaded it.
-const VERSION = '4d7a40d4b9';
+const VERSION = '99ce2e59de';
 const SHELL = 'tpnlr35140-shell-' + VERSION;
 const ROUTES = 'tpnlr35140-media'; // media of downloaded routes (kept across app versions)
-const SHELL_FILES = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest',
+const SHELL_FILES = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'idiomes.js', 'menu.js',
   'icon-192.png', 'icon-512.png', 'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2',
   'fonts/raleway-latin-ext.woff2', 'data.json', 'basemap.json'];
 const ORTO_HOST = 'geoserveis.icgc.cat', ORTO_SAVE_MAX_Z = 17;

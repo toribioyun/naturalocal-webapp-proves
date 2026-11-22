@@ -39,7 +39,8 @@ h2.sec{color:var(--olive);text-transform:uppercase;letter-spacing:.04em;font-siz
 .hero{position:relative;aspect-ratio:16/10;background:var(--brown-2);overflow:hidden}
 .hero>img{width:100%;height:100%;object-fit:cover;display:block}
 .hero-txt{position:absolute;inset:auto 0 0 0;padding:40px 16px 14px;background:linear-gradient(transparent,#000a);color:#fff;pointer-events:none} /* the title must not eat the swipe on the photos (Toribio, 22/11/2026) */
-.hero-share{position:absolute;top:10px;right:10px;z-index:3;min-height:0;padding:8px 14px;border:0;border-radius:999px;background:#000a;color:#fff;font-weight:700;font-size:.9rem}
+.hero-acts{position:absolute;top:10px;right:10px;z-index:3;display:flex;gap:8px}
+.hero-share{min-height:0;padding:8px 14px;border:0;border-radius:999px;background:#000a;color:#fff;font-weight:700;font-size:.9rem}
 .hero-txt h1{margin:4px 0 0;font-size:1.7rem;text-transform:uppercase;letter-spacing:.01em;text-shadow:0 1px 3px #0006}
 .kind{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;background:#557a08;padding:3px 10px 3px 4px;border-radius:999px}
 .kind img{width:18px;height:18px;background:var(--brown);border-radius:50%;padding:2px}

@@ -1,8 +1,8 @@
 // Service worker of the Parc Natural del Montgrí, Illes Medes i Baix Ter destination prototype (built by portal/scripts/genera.py). VERSION is set by portal/scripts/genera.py (hash of the app files).
 // App and data are saved on install; photos and ICGC map tiles (zoom ≤ 16) are saved as they are seen.
-const VERSION = 'd0f4adb4cc';
+const VERSION = 'ac363d0b3c';
 const SHELL = 'tpnlmg-shell-' + VERSION, SEEN = 'tpnlmg-vist';
-const SHELL_FILES = ['./', 'index.html', 'desti.js', 'style.css', 'manifest.webmanifest', 'icones.js', 'filtre.js', 'icon-192.png', 'icon-512.png',
+const SHELL_FILES = ['./', 'index.html', 'desti.js', 'style.css', 'manifest.webmanifest', 'icones.js', 'filtre.js', 'idiomes.js', 'menu.js', 'icon-192.png', 'icon-512.png',
   'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2', 'fonts/raleway-latin-ext.woff2', 'data.json'];
 const TILE_HOST = 'geoserveis.icgc.cat', TILE_SAVE_MAX_Z = 16;
 

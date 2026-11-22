@@ -187,6 +187,7 @@ async function checkOffline() {
   $('offBar').style.width = (100 * have / files.length) + '%';
   if (have === files.length) {
     setOff(true, 'Tot guardat al mòbil: ja pots posar el mode avió.');
+    NLM.markDownloaded(RID, {n: D.route.name, d: D.route.backName || '', href: SELF, foto: D.route.imgs[0] ? SELF + 'media/' + D.route.imgs[0] : '', mb: D.route.mediaMB});
     $('dlBtn').textContent = 'Torna a descarregar';
     $('offBox').querySelector('.muted').hidden = true;
     setBig('✓ Descarregada: la pots fer sense cobertura', true);
@@ -196,6 +197,7 @@ async function checkOffline() {
     setOff(false, have ? `Ja tens guardada una part (${Math.round(100 * have / files.length)} %): el que has obert.` : '');
     $('dlBtn').textContent = $('dlBtn').dataset.label || 'Descarrega la ruta';
   }
+  if (have < files.length) NLM.unmarkDownloaded(RID);
   if (have < files.length) setBig('⬇ ' + ($('dlBtn').dataset.label || 'Descarrega la ruta').replace('Descarrega la ruta', 'Descarrega-la per anar sense cobertura'));
 }
 function setBig(txt, done) { const b = $('dlBig'); b.textContent = txt; b.classList.toggle('done', !!done); }
@@ -375,7 +377,7 @@ function unlockAudio() {
 // back from the background or a locked screen, iPhone may leave the audio «interrupted»
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && actx && actx.state !== 'running') actx.resume().catch(() => {}); });
 function beep(n = 2) {
-  if (!alertsOn || !actx) return;
+  if (!alertsOn || !actx || !NLM.cfg().so) return; // «So» in the menu's settings (O-066)
   try {
     if (navigator.audioSession) { navigator.audioSession.type = 'playback'; clearTimeout(sessionTimer); sessionTimer = setTimeout(() => { try { navigator.audioSession.type = 'auto'; } catch (e) {} }, 400 * n + 600); }
     if (actx.state === 'suspended') actx.resume();
@@ -389,7 +391,7 @@ function beep(n = 2) {
   } catch (e) { log('So: ' + e.message); }
 }
 function chime() { // two strikes of a small bell
-  if (!alertsOn || !actx) return false;
+  if (!alertsOn || !actx || !NLM.cfg().so) return false;
   try {
     if (navigator.audioSession) { navigator.audioSession.type = 'playback'; clearTimeout(sessionTimer); sessionTimer = setTimeout(() => { try { navigator.audioSession.type = 'auto'; } catch (e) {} }, 2200); }
     if (actx.state === 'suspended') actx.resume();
@@ -405,7 +407,7 @@ function chime() { // two strikes of a small bell
 }
 const afterChime = (fn, ms = 900) => chime() ? setTimeout(fn, ms) : fn();
 function buzz(pattern) {
-  if (!alertsOn) return;
+  if (!alertsOn || !NLM.cfg().vib) return; // «Vibració» in the menu's settings (O-066)
   if (navigator.vibrate) { navigator.vibrate(pattern); return; }
   try { // iPhone: one tap per pulse of the pattern (on, off, on…)
     if (!hapticEl) {
@@ -786,10 +788,10 @@ function checkOffRoute(off, acc = 5) {
   $('offroute').textContent = navigator.onLine ? 'Fora de la ruta · mapa ampliat' : 'Fora de la ruta';
   if (offCount >= OFF_READINGS && !offWarned) {
     offWarned = true;
-    buzz([400, 150, 400, 150, 400]); beep(2);
-    notice('Atenció, estàs fora de la ruta.', {prio: true, valid: () => offWarned});
+    const warn = NLM.cfg().off; // «Fora de ruta» in the menu's settings (O-066): the map still shows it, silently
+    if (warn) { buzz([400, 150, 400, 150, 400]); beep(2); notice('Atenció, estàs fora de la ruta.', {prio: true, valid: () => offWarned}); }
     clearTimeout(offRepeat);
-    offRepeat = setTimeout(() => { if (offWarned) { buzz([400, 150, 400]); beep(2); notice('Atenció, estàs fora de la ruta.', {prio: true, valid: () => offWarned}); log('Fora de la ruta: avís repetit'); } }, 5000);
+    offRepeat = setTimeout(() => { if (offWarned && warn) { buzz([400, 150, 400]); beep(2); notice('Atenció, estàs fora de la ruta.', {prio: true, valid: () => offWarned}); log('Fora de la ruta: avís repetit'); } }, 5000);
     view.s = Math.min(view.s, Math.min(W, H) * 0.35 / Math.max(off, 1)); // zoom out: you and the route in sight
     draw(); // with coverage, the whole map (see paint)
     log('Fora de la ruta: a ' + Math.round(off) + ' m del track');
@@ -815,13 +817,14 @@ function showClimb() {
 function updateTreasures() { const n = POIS.filter(isTreasure).length; $('sTre').textContent = `${found.size}/${n}`; $('sTre').parentElement.hidden = !n; }
 function arrive(i, treasure, more = 0) {
   const p = POIS[i], far = !treasure && p.off > NEAR_M; // far: seen from the track, not reached
-  buzz(treasure ? [200, 100, 200, 100, 400] : [250, 120, 250]);
+  const say = treasure || NLM.cfg().prox; // «A prop d'un punt d'interès» in the menu's settings (O-066): the card still shows
+  if (say) buzz(treasure ? [200, 100, 200, 100, 400] : [250, 120, 250]);
   const t = $('toast'); popIdx = -1; t.className = 'toast';
   t.innerHTML = `<span class="t">${treasure ? 'Tresor trobat!' : far ? `A ${fmtM(dist([me.x, me.y], [p.x, p.y]))} de tu` : 'Has arribat'}</span><h3>${treasure ? '★ ' : p.num + '. '}${esc(p.name)}</h3>${more ? `<p class="muted">I ${more} punt${more > 1 ? 's' : ''} més a prop: els tens a la llista.</p>` : ''}<div class="row"><button class="primary grow" id="tOpen">Obre la fitxa</button><button id="tClose">Continua</button></div>`;
   t.hidden = false;
   $('tOpen').onclick = () => { t.hidden = true; openSheet(i); };
   $('tClose').onclick = () => { t.hidden = true; hush(); };
-  afterChime(() => notice(treasure ? `Enhorabona! Has trobat el ${p.name}.` : far ? `Tens a prop: ${p.name}.` : `Has arribat a ${p.name}.`));
+  if (say) afterChime(() => notice(treasure ? `Enhorabona! Has trobat el ${p.name}.` : far ? `Tens a prop: ${p.name}.` : `Has arribat a ${p.name}.`));
   log((treasure ? 'Tresor: ' : 'Arribada: ') + p.name);
 }
 // A direction or warning: short notice, it does not count as a visited point.
@@ -905,6 +908,12 @@ $('startBtn').onclick = () => { unlockAudio(); show(true); history.pushState({na
 $('backBtn').onclick = () => history.back();
 addEventListener('popstate', () => { closeSheet(); show(false); });
 
+/* ---------- the ☰ menu (O-066): favourites, downloaded routes, settings ---------- */
+const PATH = location.pathname.split('/').filter(Boolean), IN_DEST = PATH.length > 2 && PATH[PATH.length - 2] === 'rutes';
+const RID = IN_DEST ? PATH[PATH.length - 1] : (PATH[PATH.length - 1] || 'ruta'), FOLDER = IN_DEST ? PATH[PATH.length - 3] : PATH[PATH.length - 1];
+const SELF = IN_DEST ? `${FOLDER}/rutes/${RID}/` : `${FOLDER}/`; // this app, from the root of the site
+NLM.init({root: IN_DEST ? '../../../' : '../', bar: '#home .appbar'});
+const favRoute = () => ({k: FOLDER + '/ruta-' + RID, kind: 'ruta', n: D.route.name, d: D.route.backName || '', foto: D.route.imgs[0] ? SELF + 'media/' + D.route.imgs[0] : '', lat: LAT0, lon: LON0});
 /* ---------- start ---------- */
 (async function init() {
   updateNet();
@@ -918,6 +927,7 @@ addEventListener('popstate', () => { closeSheet(); show(false); });
   POIS.sort((a, b) => a.along - b.along);
   let num = 0; POIS.forEach(p => { if (!isInfo(p) && !isTreasure(p)) p.num = ++num; }); // numbered in walking order; information points and treasures apart
   buildLayers(); renderHome(); updateTreasures(); updateNext(0, NaN);
+  NLM.heart($('favBtn'), favRoute);
   buildClimb();
   $('profBox').hidden = !ELE.length; $('profSum').textContent = profSummary(); $('profMode').hidden = TOTAL <= TRAM_M * 1.5;
   document.querySelectorAll('.stat.ele').forEach(t => t.hidden = !ELE.length); showClimb();
