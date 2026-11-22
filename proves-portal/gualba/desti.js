@@ -54,12 +54,20 @@ function updateNet() { const on = navigator.onLine; $('net').textContent = on ? 
 addEventListener('online', () => { updateNet(); tiles.clear(); draw(); });
 addEventListener('offline', updateNet);
 document.addEventListener('error', e => { if (e.target.tagName === 'IMG') e.target.classList.add('broken'); }, true);
+let sheetIt = null, sheetAt = 0, reloadOnClose = false; // the open sheet, for a new version arriving meanwhile
 if ('serviceWorker' in navigator) {
   // A new version installs in the background: show it straight away (not at the next opening), unless navigating or reading a sheet.
   const c0 = navigator.serviceWorker.controller, hadWorker = !!c0 && c0.scriptURL === new URL('sw.js', location.href).href; // a parent app's worker does not count
   let reloading = false, swReg = null;
+  // With a sheet open (Toribio, 22/11/2026: a sheet opened from the portal kept the old version and its grey text):
+  // just opened (under 10 s, e.g. from the portal or a shared link) → reload on the same sheet; being read → reload when it closes.
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!hadWorker || reloading || nav || !$('sheet').hidden) return;
+    if (!hadWorker || reloading || nav) return;
+    if (!$('sheet').hidden) {
+      if (sheetIt && Date.now() - sheetAt < 10000) { reloading = true; history.replaceState(null, '', location.pathname + location.search + '#' + keyOf(sheetIt)); location.reload(); }
+      else reloadOnClose = true;
+      return;
+    }
     reloading = true; location.reload();
   });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && swReg) swReg.update().catch(() => {}); });
@@ -186,7 +194,7 @@ $('guide').onclick = e => {
 
 /* ---------- detail sheet ---------- */
 function openSheet(i) {
-  const it = ITEMS[i];
+  const it = ITEMS[i]; sheetIt = it; sheetAt = Date.now();
   gallery($('shGal'), it.pics);
   setDots($('shDots'), it.pics.length); arrows($('shGal'), it.pics.length);
   $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span><span>${esc(catLabel(it))}</span>${it.mun ? ' · ' + esc([...new Set([it.mun, ...(it.muns || [])])].slice(0, 3).join(', ')) : ''}`;
@@ -215,7 +223,8 @@ function openSheet(i) {
 }
 $('shGal').addEventListener('scroll', () => moveDots($('shDots'), $('shGal')), {passive: true});
 $('dGal').addEventListener('scroll', () => moveDots($('dDots'), $('dGal')), {passive: true});
-function closeSheet() { $('sheet').hidden = true; }
+function closeSheet() { $('sheet').hidden = true; sheetIt = null; }
+function closeByUser() { closeSheet(); if (reloadOnClose && !nav) { reloadOnClose = false; location.reload(); } } // a new version that came while reading
 // Text of a route as on the web: the introduction (title and text) in full, and below it two folded parts,
 // «Descripció» (the walk, step by step) and «Consells» by sections (Traçat, Aigua…) with their points (Toribio, 11/11/2026).
 const CHEV = '<svg class="chev" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -312,8 +321,8 @@ async function portalLinks() {
   $('nearDest').innerHTML = `<h2 class="gsec">Altres destins a prop</h2><ul class="cards">${near.map(d => `<li><a class="cardlink" href="../${esc(d.c)}/">${d.foto ? `<img src="../${esc(d.c)}/${esc(d.foto)}" alt="" loading="lazy">` : ''}<span><small>${d.parc ? 'Parc' : 'Destí'} · a ${fmtM(km(d))}</small><b>${esc(d.n)}</b><span class="sub">${d.nR} rutes · ${d.nV} visites</span></span><span class="chev">›</span></a></li>`).join('')}</ul>`;
   $('nearDest').hidden = false;
 }
-$('shClose').onclick = closeSheet;
-$('sheet').onclick = e => { if (e.target === $('sheet')) closeSheet(); };
+$('shClose').onclick = closeByUser;
+$('sheet').onclick = e => { if (e.target === $('sheet')) closeByUser(); };
 
 /* ---------- map ---------- */
 const cv = $('map'), ctx = cv.getContext('2d');
