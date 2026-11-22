@@ -98,6 +98,8 @@ const NLM = (() => {
   const CSS = `
 .mn-btn{flex:none;min-height:40px;width:44px;padding:0;border:0;border-radius:10px;background:transparent;color:#fff;display:grid;place-items:center;margin-left:4px}
 .mn-btn:active{background:#fff2}
+.hero-acts{position:absolute;top:10px;right:10px;z-index:3;display:flex;gap:8px}.gal-wrap .hero-acts{right:64px}
+.hero-btn{min-height:0;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:#0009;color:#fff;font-size:1.25rem;line-height:1;display:grid;place-items:center}.hero-btn[aria-pressed="true"]{color:#ff5c8a}
 html:not([lang=ca]) .facts{grid-template-columns:repeat(2,1fr)} /* other languages have longer words */
 .facts>div{min-width:0}.facts dd,.facts dt{overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto} /* long words of other languages (Familienfreundlich) */
 .appbar:has(.mn-btn){flex-wrap:nowrap}.appbar:has(.mn-btn) .logo{min-width:0;flex:0 1 auto;max-width:44vw}
@@ -195,5 +197,10 @@ html:not([lang=ca]) .facts{grid-template-columns:repeat(2,1fr)} /* other languag
     const m = el.querySelector('[data-favmap]');
     if (m) m.onclick = () => { close(); if (onFavMap) onFavMap(); else location.href = ROOT + '#favorits'; };
   }
-  return {init, heart, isFav, favs, toggle, cfg, T, markDownloaded, unmarkDownloaded, open};
+  async function share(title, url, btn) {
+    if (navigator.share) { try { await navigator.share({title, text: title + ' · Natura Local', url}); } catch (e) {} return; }
+    let ok = false; try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {}
+    const old = btn.innerHTML; btn.innerHTML = ok ? '✓' : '!'; btn.title = ok ? T('Enllaç copiat ✓') : url; setTimeout(() => { btn.innerHTML = old; btn.title = T('Comparteix'); }, 2000);
+  }
+  return {share, init, heart, isFav, favs, toggle, cfg, T, markDownloaded, unmarkDownloaded, open};
 })();

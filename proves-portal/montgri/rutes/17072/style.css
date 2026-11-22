@@ -173,4 +173,3 @@ video{width:100%;border-radius:14px;background:#000;margin:0 0 10px;display:bloc
 .body tr:first-child td{background:var(--olive);color:#fff}
 .sh-nav{position:sticky;bottom:0;display:flex;gap:8px;justify-content:space-between;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line);margin-top:auto}
 .sh-nav button{flex:1}
-.fav-btn{margin:4px 0 12px} /* ♡ favourite (O-066) */

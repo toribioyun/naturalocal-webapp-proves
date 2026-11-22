@@ -927,7 +927,8 @@ const favRoute = () => ({k: FOLDER + '/ruta-' + RID, kind: 'ruta', n: D.route.na
   POIS.sort((a, b) => a.along - b.along);
   let num = 0; POIS.forEach(p => { if (!isInfo(p) && !isTreasure(p)) p.num = ++num; }); // numbered in walking order; information points and treasures apart
   buildLayers(); renderHome(); updateTreasures(); updateNext(0, NaN);
-  NLM.heart($('favBtn'), favRoute);
+  NLM.heart($('rFav'), favRoute, {icon: true});
+  $('rShare').onclick = () => NLM.share(D.route.name, new URL(IN_DEST ? `../../fitxa/ruta-${RID}/` : './', location.href).href, $('rShare'));
   buildClimb();
   $('profBox').hidden = !ELE.length; $('profSum').textContent = profSummary(); $('profMode').hidden = TOTAL <= TRAM_M * 1.5;
   document.querySelectorAll('.stat.ele').forEach(t => t.hidden = !ELE.length); showClimb();

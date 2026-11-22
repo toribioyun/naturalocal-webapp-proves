@@ -201,11 +201,11 @@ function openSheet(i) {
   else if (it.g === 'ruta') acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
   if (it.tel) acts.push(`<a class="btn" href="tel:${esc(it.tel)}">📞 Truca</a>`);
   acts.push(`<button id="aMap">Veure al mapa</button>`);
-  acts.push(`<button id="aFav"></button>`, `<button id="aShare">Comparteix</button>`);
   if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Veure la fitxa a Natura Local ↗</a>`);
   $('shActions').innerHTML = acts.join('');
-  $('aShare').onclick = () => share(it.n, shareUrl(it), $('aShare'));
-  NLM.heart($('aFav'), favItem(it));
+  // ♡ and share always on the photo, top right, as in the destination and the route (Toribio, 22/11/2026)
+  $('shShare').onclick = () => share(it.n, shareUrl(it), $('shShare'));
+  NLM.heart($('shFav'), favItem(it), {icon: true});
   if ($('aNav')) $('aNav').onclick = () => { closeSheet(); startNav(it); };
   $('shActions').querySelectorAll('a[href^="rutes/"]').forEach(a => { a.onclick = rememberView; });
   $('aMap').onclick = () => { closeSheet(); showOnMap(it); };
