@@ -310,10 +310,11 @@ a.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--brown)
 @media (hover:hover) and (pointer:fine){.garr:not([hidden]){display:grid;place-items:center}}
 /* Points of interest of a route, inside its sheet (Toribio, 22/11/2026) */
 .pois{margin-top:18px}.pois h3{margin:0 0 8px}
-.poi{border:1px solid var(--line);border-radius:14px;margin:0 0 8px;background:#fff;overflow:hidden}
+.poi{border:1px solid var(--line);border-radius:14px;margin:0 0 8px;background:#fff;color:#1f1a16;overflow:hidden} /* always black on white, also with the phone in dark mode (Toribio, 22/11/2026) */
+.poi summary small{color:#6f675e!important}.poi .poi-in strong,.poi .poi-in b{font-weight:800;color:#000}.poi .poi-in a{color:#4f6f09}
 .poi summary{display:flex;align-items:center;gap:10px;padding:8px;cursor:pointer;list-style:none}.poi summary::-webkit-details-marker{display:none}
 .poi summary img,.poi summary .ph{flex:none;width:56px;height:56px;border-radius:10px;object-fit:cover}
-.poi summary b{display:block}.poi summary small{color:var(--muted,#7a6e62)}
+.poi summary b{display:block;color:#1f1a16}
 .poi summary .chev{margin-left:auto;flex:none;transition:transform .2s}.poi[open] summary .chev{transform:rotate(180deg)}
 .poi .poi-in{padding:0 12px 12px}.poi .poi-in img{max-width:100%;height:auto;border-radius:10px}
 .poi .poi-gal{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;margin-bottom:8px}.poi .poi-gal img{flex:0 0 88%;scroll-snap-align:start;aspect-ratio:16/10;object-fit:cover}
