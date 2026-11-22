@@ -58,6 +58,28 @@ function paintTiles() {
     ctx.drawImage(t.img, sx, sy, sw, sw, px0 - 0.5, py0 - 0.5, px1 - px0 + 1, py1 - py0 + 1);
   }
 }
+/* Routes as in a destination's map (Toribio, 22/11/2026): each one with its own colour (cerca.json, col) and the
+   destination's pin with the route signpost; the chosen one bigger and thicker, in its colour. */
+const PATHS = Object.fromEntries(Object.entries(ICONS).map(([k, v]) => [k, v.d.map(d => new Path2D(d))]));
+function drawIcon(name, cx, cy, size, col) {
+  const ic = ICONS[name], [x0, y0, w, h] = Array.isArray(ic.vb) ? ic.vb : [0, 0, ic.vb, ic.vb], k = size / Math.max(w, h);
+  ctx.save(); ctx.translate(cx - w * k / 2, cy - h * k / 2); ctx.scale(k, k); ctx.translate(-x0, -y0); ctx.fillStyle = col;
+  for (const p of PATHS[name]) ctx.fill(p);
+  ctx.restore();
+}
+const routeCol = it => it.col || (it.mo === 'bici' ? '#1f6f8b' : '#69920c');
+function routePin(x, y, col, big) {
+  const k = big ? 1.3 : 1;
+  ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(-5, -9, -14, -14, -14, -24); ctx.arc(0, -24, 14, Math.PI, 0); ctx.bezierCurveTo(14, -14, 5, -9, 0, 0); ctx.closePath();
+  ctx.shadowColor = '#0006'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1; ctx.fillStyle = col; ctx.fill(); ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  drawIcon('ruta', 0, -24, 16, '#fff'); ctx.restore();
+}
+function track(tr, col, on) {
+  ctx.beginPath(); tr.forEach((p, k) => { const [x, y] = ll2s(p[0], p[1]); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = on ? 11 : 6.5; ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = on ? 6.5 : 3.5; ctx.stroke();
+}
 function pin(sx, sy, col, r) { // teardrop pin with its tip at (sx, sy)
   ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx - r * 0.6, sy - r, sx - r, sy - r * 1.3, sx - r, sy - r * 1.8);
   ctx.arc(sx, sy - r * 1.8, r, Math.PI, 0); ctx.bezierCurveTo(sx + r, sy - r * 1.3, sx + r * 0.6, sy - r, sx, sy); ctx.closePath();
@@ -76,14 +98,12 @@ function paint() {
   if (mode === 'fav') { paintFavs(); return; }
   if (showItems()) {
     ctx.lineJoin = ctx.lineCap = 'round';
-    for (const t of DATA.T) {
-      ctx.beginPath(); t.tr.forEach((p, k) => { const [x, y] = ll2s(p[0], p[1]); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-      const on = popItem && popItem.id === t.id;
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = on ? 8 : 6; ctx.stroke(); ctx.strokeStyle = on ? '#e8590c' : '#69920c'; ctx.lineWidth = on ? 5 : 3; ctx.stroke();
-    }
+    const onT = popItem && popItem.g === 'ruta' ? TRK.get(popItem.c + '/' + popItem.id) : null;
+    for (const t of DATA.T) if (t !== onT) track(t.tr, t.col || '#69920c', false);
+    if (onT) track(onT.tr, routeCol(popItem), true);
     for (const it of DATA.I) {
       const [x, y] = ll2s(it.lat, it.lon); if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue;
-      if (it.g === 'ruta') { pin(x, y, it === popItem ? '#e8590c' : GROUPS.ruta.col, 7); continue; }
+      if (it.g === 'ruta') { if (it !== popItem) routePin(x, y, routeCol(it), false); continue; }
       ctx.beginPath(); ctx.arc(x, y, it === popItem ? 8 : 6, 0, 7); ctx.fillStyle = GROUPS[it.g].col; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
     }
   }
@@ -94,7 +114,8 @@ function paint() {
     ctx.beginPath(); ctx.arc(x, y - (big ? 21.6 : 18), big ? 4.5 : 3.8, 0, 7); ctx.fillStyle = '#e9bc00'; ctx.fill();
     label(short(d), x, y + 4, big);
   }
-  if (popItem) { // the chosen place, on top of everything, so it is clear which one it is
+  if (popItem && popItem.g === 'ruta') { const [x, y] = ll2s(popItem.lat, popItem.lon); routePin(x, y, routeCol(popItem), true); }
+  else if (popItem) { // the chosen place, on top of everything, so it is clear which one it is
     const [x, y] = ll2s(popItem.lat, popItem.lon); pin(x, y, '#e8590c', 13);
     ctx.beginPath(); ctx.arc(x, y - 23.4, 5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
   }
@@ -103,18 +124,14 @@ function paint() {
 function paintRoutes() { // «Rutes»: the routes that pass the filter, at any zoom; destinations only as a name
   ctx.lineJoin = ctx.lineCap = 'round';
   const list = routes();
-  if (view.z >= 9.5) for (const it of list) {
-    const t = TRK.get(it.c + '/' + it.id); if (!t) continue;
-    ctx.beginPath(); t.tr.forEach((p, k) => { const [x, y] = ll2s(p[0], p[1]); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-    const on = popItem === it;
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = on ? 8 : 5; ctx.stroke(); ctx.strokeStyle = on ? '#e8590c' : it.mo === 'bici' ? '#1f6f8b' : '#69920c'; ctx.lineWidth = on ? 5 : 2.5; ctx.stroke();
-  }
+  if (view.z >= 9.5) for (const it of list) { const t = TRK.get(it.c + '/' + it.id); if (t && it !== popItem) track(t.tr, routeCol(it), false); }
+  if (popItem && popItem.g === 'ruta') { const t = TRK.get(popItem.c + '/' + popItem.id); if (t) track(t.tr, routeCol(popItem), true); }
   for (const d of DATA.D) { const [x, y] = ll2s(d.lat, d.lon); label(short(d), x, y + 4, false); }
   for (const it of list) {
     const [x, y] = ll2s(it.lat, it.lon); if (x < -20 || y < -20 || x > W + 20 || y > H + 20 || it === popItem) continue;
-    pin(x, y, it.mo === 'bici' ? '#1f6f8b' : GROUPS.ruta.col, 8);
+    routePin(x, y, routeCol(it), false);
   }
-  if (popItem) { const [x, y] = ll2s(popItem.lat, popItem.lon); pin(x, y, '#e8590c', 13); ctx.beginPath(); ctx.arc(x, y - 23.4, 5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); }
+  if (popItem) { const [x, y] = ll2s(popItem.lat, popItem.lon); routePin(x, y, routeCol(popItem), true); }
   if (me) { const [x, y] = ll2s(me[0], me[1]); ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fillStyle = '#1b6ca8'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke(); }
 }
 /* ---------- favourites (O-066): what was kept with ♡ in any app, on the map and in the cards ---------- */
@@ -258,10 +275,12 @@ function selectDest(d, scrollCard) {
 function showPop(it) {
   popItem = it; const d = destOf(it.c), g = GROUPS[it.g];
   $('pop').innerHTML = `<span class="t" style="color:${g.col === '#e9bc00' ? '#8a6d00' : g.col}"><span>${g.label}</span> · ${esc(short(d))}${it.m ? ' · ' + esc(it.m.split(', ')[0]) : ''}</span><h3>${esc(it.n)}</h3>
-    <div class="row"><a class="btn primary" href="${esc(it.c)}/#${it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei'}-${encodeURIComponent(it.id)}">Obre la fitxa ›</a><button id="popFav" class="small"></button><button id="popClose" class="small">Tanca</button></div>`;
+    <div class="pop-acts"><button id="popFav" class="hero-btn"></button><button id="popShare" class="hero-btn" aria-label="Comparteix" title="Comparteix"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg></button></div>
+    <div class="row"><a class="btn primary" href="${esc(it.c)}/#${it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei'}-${encodeURIComponent(it.id)}">Obre la fitxa ›</a><button id="popClose" class="small">Tanca</button></div>`;
   $('pop').hidden = false; $('cards').hidden = true; $('popClose').onclick = hidePop; draw(); remember();
   const kind = it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei';
-  NLM.heart($('popFav'), {k: it.c + '/' + kind + '-' + it.id, kind, n: it.n, d: short(d), foto: it.f ? it.c + '/' + it.f : '', lat: it.lat, lon: it.lon});
+  NLM.heart($('popFav'), {k: it.c + '/' + kind + '-' + it.id, kind, n: it.n, d: short(d), foto: it.f ? it.c + '/' + it.f : '', lat: it.lat, lon: it.lon}, {icon: true});
+  $('popShare').onclick = () => NLM.share(it.n, new URL(it.c + '/fitxa/' + kind + '-' + encodeURIComponent(it.id) + '/', location.href).href, $('popShare'));
 }
 function hidePop() { if (!popItem && $('pop').hidden) return; popItem = null; $('pop').hidden = true; $('cards').hidden = false; draw(); }
 
