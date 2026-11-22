@@ -256,6 +256,7 @@ async function share(title, url, btn) {
     const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select();
     try { ok = document.execCommand('copy'); } catch (e2) {} t.remove();
   }
+  if (btn.classList.contains('hero-btn')) { const old = btn.innerHTML; btn.innerHTML = ok ? '✓' : '!'; btn.title = ok ? 'Enllaç copiat ✓' : url; setTimeout(() => { btn.innerHTML = old; btn.title = 'Comparteix'; }, 2000); return; }
   const old = btn.textContent; btn.textContent = ok ? 'Enllaç copiat ✓' : url; setTimeout(() => { btn.textContent = old; }, ok ? 2000 : 8000);
 }
 function fromHash(h) { // #ruta-123, #visita-123, #servei-123; and the old #123 (route first), still used by the route apps
@@ -513,7 +514,7 @@ NLM.init({root: '../'}); // the ☰ menu (O-066): favourites, downloaded routes,
   $('dName').textContent = D.D.nom; document.title = 'Natura Local · ' + D.D.nom;
   gallery($('dGal'), D.D.pics); setDots($('dDots'), D.D.pics.length); arrows($('dGal'), D.D.pics.length);
   $('dShare').onclick = () => share(D.D.nom, destUrl(), $('dShare'));
-  NLM.heart($('dFav'), favDest);
+  NLM.heart($('dFav'), favDest, {icon: true});
   renderChips(); renderGuide();
   resize(); fitAll();
   restoreView();

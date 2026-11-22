@@ -30,9 +30,9 @@ const NLM = (() => {
     return !on;
   }
   // A ♡ button: filled when the item is a favourite. The item is given as a function when it is only known later.
-  function heart(btn, item) {
+  function heart(btn, item, o = {}) {
     const it = () => typeof item === 'function' ? item() : item;
-    const show = () => { const on = isFav(it().k); btn.innerHTML = (on ? '♥ ' : '♡ ') + T(on ? 'Desat' : 'Desa'); btn.setAttribute('aria-pressed', on); btn.title = T(on ? 'Treu dels favorits' : 'Afegeix als favorits'); };
+    const show = () => { const on = isFav(it().k); btn.innerHTML = o.icon ? (on ? '♥' : '♡') : (on ? '♥ ' : '♡ ') + T(on ? 'Desat' : 'Desa'); btn.setAttribute('aria-pressed', on); btn.title = T(on ? 'Treu dels favorits' : 'Afegeix als favorits'); btn.setAttribute('aria-label', btn.title); };
     btn.classList.add('mn-heart'); btn.onclick = e => { e.stopPropagation(); toggle(it()); show(); };
     btn._nlmShow = show; if (!btn._nlm) { btn._nlm = 1; addEventListener('tpnlfav', () => btn._nlmShow()); } show();
   }
