@@ -58,7 +58,7 @@ const RF = (() => {
         const a = draft[b.dataset.k], i = a.indexOf(b.dataset.v); i < 0 ? a.push(b.dataset.v) : a.splice(i, 1); render();
       });
       el.querySelectorAll('.rf-swi').forEach(b => b.onclick = () => { draft[b.dataset.sw] = !draft[b.dataset.sw]; render(); });
-      el.querySelector('#rfClear').onclick = () => { draft = empty(); render(); };
+      el.querySelector('#rfClear').onclick = () => { on = empty(); save(); close(); onChange(); }; // clears and applies at once (Toribio, 22/11/2026)
       el.querySelector('#rfApply').onclick = () => { on = draft; save(); close(); onChange(); };
       el.querySelector('#rfClose').onclick = close;
     };

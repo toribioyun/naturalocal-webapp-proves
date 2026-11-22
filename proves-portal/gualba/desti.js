@@ -204,11 +204,12 @@ function openSheet(i) {
   acts.push(`<button id="aShare">Comparteix</button>`);
   if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Veure la fitxa a Natura Local ↗</a>`);
   $('shActions').innerHTML = acts.join('');
-  $('aShare').onclick = () => share(it, $('aShare'));
+  $('aShare').onclick = () => share(it.n, shareUrl(it), $('aShare'));
   if ($('aNav')) $('aNav').onclick = () => { closeSheet(); startNav(it); };
   $('shActions').querySelectorAll('a[href^="rutes/"]').forEach(a => { a.onclick = rememberView; });
   $('aMap').onclick = () => { closeSheet(); showOnMap(it); };
-  $('shBody').innerHTML = it.g === 'ruta' ? routeText(it) : (it.desc || []).map(p => `<p>${p}</p>`).join('');
+  $('shBody').innerHTML = (it.g === 'ruta' ? routeText(it) : (it.desc || []).map(p => `<p>${p}</p>`).join('')) + (it.app ? '<div class="pois" id="shPois"></div>' : '');
+  if (it.app) routePois(it);
   $('sheet').hidden = false; $('sheet').querySelector('.sheet-in').scrollTop = 0;
 }
 $('shGal').addEventListener('scroll', () => moveDots($('shDots'), $('shGal')), {passive: true});
@@ -243,9 +244,9 @@ function rememberView() { try { sessionStorage.setItem('tpnl-desti-vista', JSON.
 const kindOf = it => it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei';
 const keyOf = it => kindOf(it) + '-' + it.id;
 const shareUrl = it => new URL('fitxa/' + keyOf(it) + '/', new URL('./', location.href)).href;
-async function share(it, btn) {
-  const url = shareUrl(it);
-  if (navigator.share) { try { await navigator.share({title: it.n, text: it.n + ' · Natura Local', url}); } catch (e) {} return; }
+const destUrl = () => new URL('fitxa/desti/', new URL('./', location.href)).href; // the destination itself (Toribio, 22/11/2026)
+async function share(title, url, btn) {
+  if (navigator.share) { try { await navigator.share({title, text: title + ' · Natura Local', url}); } catch (e) {} return; }
   let ok = false;
   try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {
     const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select();
@@ -261,6 +262,7 @@ function fromHash(h) { // #ruta-123, #visita-123, #servei-123; and the old #123 
 function restoreView() {
   const id = decodeURIComponent(location.hash.slice(1)); if (!id) return;
   history.replaceState(null, '', location.pathname + location.search);
+  if (id === 'desti') { showTab(false); return; } // the shared destination: its guide
   let v = null; try { v = JSON.parse(sessionStorage.getItem('tpnl-desti-vista')); } catch (e) {}
   if (v && v.c !== HERE) v = null; // the view kept by another destination
   if (v && v.filter && (v.filter === 'tot' || ITEMS.some(i => i.g === v.filter))) { filter = v.filter; renderChips(); renderGuide(); draw(); }
@@ -268,6 +270,24 @@ function restoreView() {
   // a route back from its app, or any place chosen in the portal's search (../#id)
   const it = fromHash(id);
   if (it) openSheet(it.i);
+}
+/* Points of interest of a route with its own app, in its sheet (Toribio, 22/11/2026): read from that app's data.json,
+   which the service worker keeps once seen, so they also show without connection. Each one unfolds with its photos and text. */
+async function routePois(it) {
+  const box = $('shPois'), base = it.app;
+  let R = null;
+  try { R = await fetch(base + 'data.json').then(r => r.ok ? r.json() : null); } catch (e) {}
+  if (box !== $('shPois') || !box.isConnected) return; // another sheet opened meanwhile
+  if (!R) { box.innerHTML = `<h3>Punts d'interès</h3><p class="muted">Obre-la amb connexió per veure'ls.</p>`; return; }
+  const pois = R.pois.filter(p => p.kind !== 'info');
+  if (!pois.length) return;
+  const fix = h => (h || '').replace(/(src|href)="media\//g, `$1="${base}media/`);
+  box.innerHTML = `<h3>Punts d'interès <small>${pois.length}</small></h3>` + pois.map((p, k) => {
+    const th = p.imgs[0] ? `<img src="${base}media/${esc(p.imgs[0])}" alt="" loading="lazy">` : `<span class="ph" style="background:${it.col}">${svgIcon('viewpoint', '#fff', 26)}</span>`;
+    const gal = p.imgs.length ? `<div class="poi-gal">${p.imgs.map(f => `<img src="${base}media/${esc(f)}" alt="" loading="lazy">`).join('')}</div>` : '';
+    const txt = /\S/.test((p.html || '').replace(/<[^>]*>|&nbsp;/g, '')) ? fix(p.html) : '<p class="muted">Aquest punt encara no té text.</p>';
+    return `<details class="poi"><summary>${th}<span><small>${k + 1}${p.theme ? ' · ' + esc(p.theme) : ''}</small><b>${esc(p.name)}</b></span>${CHEV}</summary><div class="poi-in">${gal}${txt}</div></details>`;
+  }).join('');
 }
 /* ---------- portal (O-033): way back to every destination, and the nearest ones ---------- */
 async function portalLinks() {
@@ -487,6 +507,7 @@ function simulate() {
   setLayer('osm');
   $('dName').textContent = D.D.nom; document.title = 'Natura Local · ' + D.D.nom;
   gallery($('dGal'), D.D.pics); setDots($('dDots'), D.D.pics.length); arrows($('dGal'), D.D.pics.length);
+  $('dShare').onclick = () => share(D.D.nom, destUrl(), $('dShare'));
   renderChips(); renderGuide();
   resize(); fitAll();
   restoreView();

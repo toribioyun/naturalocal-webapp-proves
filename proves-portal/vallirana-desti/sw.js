@@ -1,6 +1,6 @@
 // Service worker of the Vallirana destination prototype (built by portal/scripts/genera.py). VERSION is set by portal/scripts/genera.py (hash of the app files).
 // App and data are saved on install; photos and ICGC map tiles (zoom ≤ 16) are saved as they are seen.
-const VERSION = '0d79fad427';
+const VERSION = '83095de6bb';
 const SHELL = 'tpnlv-shell-' + VERSION, SEEN = 'tpnlv-vist';
 const SHELL_FILES = ['./', 'index.html', 'desti.js', 'style.css', 'manifest.webmanifest', 'icones.js', 'filtre.js', 'icon-192.png', 'icon-512.png',
   'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2', 'fonts/raleway-latin-ext.woff2', 'data.json'];
@@ -18,8 +18,14 @@ self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url), tile = url.hostname === TILE_HOST;
   if (req.method !== 'GET' || (url.origin !== location.origin && !tile)) return;
   // a shared link (fitxa/<kind>-<id>/, O-042): straight to the app on that sheet, also without connection
-  const shared = req.mode === 'navigate' && /\/fitxa\/([a-z]+-[^/]+)\/?(index\.html)?$/.exec(url.pathname);
+  const shared = req.mode === 'navigate' && /\/fitxa\/([a-z]+(?:-[^/]+)?)\/?(index\.html)?$/.exec(url.pathname);
   if (shared) { e.respondWith(Response.redirect(new URL('./#' + shared[1], self.registration.scope).href, 302)); return; }
+  // a route's data.json (its points of interest, shown in the route's sheet): from the network when there is one, so it is never stale
+  if (/\/rutes\/[^/]+\/data\.json$/.test(url.pathname)) {
+    e.respondWith(fetch(req).then(async res => { if (res.ok) await (await caches.open(SEEN)).put(req.url, res.clone()); return res; })
+      .catch(async () => (await caches.match(req.url, {ignoreSearch: true})) || Response.error()));
+    return;
+  }
   e.respondWith((async () => {
     const hit = await caches.match(req.url, {ignoreSearch: true});
     if (hit) return hit;
