@@ -34,8 +34,10 @@ const NLM = (() => {
     const it = () => typeof item === 'function' ? item() : item;
     const show = () => { const on = isFav(it().k); btn.innerHTML = o.icon ? (on ? '♥' : '♡') : (on ? '♥ ' : '♡ ') + T(on ? 'Desat' : 'Desa'); btn.setAttribute('aria-pressed', on); btn.title = T(on ? 'Treu dels favorits' : 'Afegeix als favorits'); btn.setAttribute('aria-label', btn.title); };
     btn.classList.add('mn-heart'); btn.onclick = e => { e.stopPropagation(); toggle(it()); show(); };
-    btn._nlmShow = show; if (!btn._nlm) { btn._nlm = 1; addEventListener('tpnlfav', () => btn._nlmShow()); } show();
+    btn._nlmShow = show; show();
   }
+  // one listener for every ♡ on the page (audit 23/11/2026: one per button used to pile up, 51 after 50 popups)
+  addEventListener('tpnlfav', () => document.querySelectorAll('.mn-heart').forEach(b => b._nlmShow && b._nlmShow()));
 
   /* ---------- downloaded routes (written by the route app when a download is complete) ---------- */
   const markDownloaded = (id, info) => { const d = get(DL, {}); d[id] = {...d[id], ...info, t: Date.now()}; put(DL, d); };

@@ -176,11 +176,15 @@ function renderHome() {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 
 /* ---------- offline download ---------- */
+let shellTries = 0;
 async function checkOffline() {
   const files = downloadList();
   if (!('caches' in window)) { setOff(false, 'Aquest navegador no pot guardar la ruta: només es pot fer amb cobertura.'); $('dlBtn').disabled = true; return; }
   const c = await caches.open(MEDIA_CACHE);
   let have = 0; for (const f of files) if (await c.match(f)) have++;
+  // the app itself must be saved too (audit 23/11/2026): otherwise «ready for airplane mode» could be false
+  const shellOk = !!(navigator.serviceWorker && navigator.serviceWorker.controller) && (await Promise.all(['index.html', 'app.js', 'data.json', 'basemap.json'].map(f => caches.match(f)))).every(Boolean);
+  if (have === files.length && !shellOk && navigator.onLine && shellTries++ < 10) { setOff(false, 'Gairebé a punt: espera uns segons amb connexió.'); setTimeout(checkOffline, 3000); return; }
   const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
   const persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : false;
   log(`Fitxers guardats: ${have}/${files.length}` + (est ? ` · espai usat ${(est.usage / 1e6).toFixed(1)} MB` : '') + ` · guardat persistent: ${persisted ? 'sí' : 'no'}`);
@@ -230,7 +234,10 @@ $('dlBtn').onclick = async () => {
       n++; $('offBar').style.width = (100 * n / files.length) + '%'; setBig(`Descarregant… ${Math.round(100 * n / files.length)} %`);
     }
     log(`Descàrrega completa: ${n} fitxers, ${(bytes / 1e6).toFixed(1)} MB nous`);
-  } catch (err) { log('Error en descarregar: ' + err.message); alertMsg('No s\'ha pogut descarregar tot. Torna-ho a provar amb bona connexió.'); }
+  } catch (err) {
+    log('Error en descarregar: ' + err.name + ' ' + err.message);
+    alertMsg(err.name === 'QuotaExceededError' ? 'No hi ha prou espai al mòbil: esborra alguna ruta descarregada al menú ☰.' : 'No s\'ha pogut descarregar tot. Torna-ho a provar amb bona connexió.');
+  }
   btn.disabled = false; checkOffline();
 };
 $('resetBtn').onclick = async () => { await caches.delete(MEDIA_CACHE); tiles.clear(); log('Descàrrega esborrada'); $('offBar').style.width = '0'; checkOffline(); };
@@ -802,7 +809,8 @@ function checkOffRoute(off, acc = 5) {
 }
 function updateNext(i, d) {
   let badge, name, txt;
-  if (i < 0) { badge = '✓'; name = 'Has vist tots els punts'; txt = 'Ruta completada'; }
+  if (i < 0 && isNaN(d)) { badge = '·'; name = 'Sense punts d’interès'; txt = ''; }
+  else if (i < 0) { badge = '✓'; name = 'Has vist tots els punts'; txt = 'Ruta completada'; }
   else { const p = POIS[i]; badge = isTreasure(p) ? '★' : p.num; name = p.name; txt = isNaN(d) ? 'Primer punt' : 'Punt més proper · ' + fmtM(d); $('nextBtn').dataset.i = i; }
   $('nBadge').textContent = $('mBadge').textContent = badge;
   $('nName').textContent = $('mName').textContent = name;
@@ -836,8 +844,12 @@ function arriveInfo(i) {
   log('Indicació: ' + p.name);
 }
 let wake = null;
+function stopGps() { // leaving the navigation (audit 23/11/2026): no positions, notices or awake screen on the home page
+  if (gpsWatch != null) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; $('gpsBtn').textContent = 'Activa el GPS'; }
+  if (wake) { wake.release().catch(() => {}); wake = null; }
+}
 async function keepAwake() { try { if ('wakeLock' in navigator) { wake = await navigator.wakeLock.request('screen'); log('Pantalla sempre encesa: sí'); } } catch (e) { log('Pantalla sempre encesa: no (' + e.message + ')'); } }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (gpsWatch != null || simTimer)) keepAwake(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !$('nav').hidden && (gpsWatch != null || simTimer)) keepAwake(); });
 $('gpsBtn').onclick = () => {
   unlockAudio();
   if (gpsWatch != null) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; $('gpsBtn').textContent = 'Activa el GPS'; return; }
@@ -902,7 +914,7 @@ async function startCompass() {
 /* ---------- screens ---------- */
 function show(nav) {
   $('home').hidden = nav; $('nav').hidden = !nav;
-  if (nav) { resize(); if (!me) fitRoute(); drawProfile(); } else { if ($('nav').classList.contains('full')) setFull(false); stopSim(); hush(); checkOffline(); }
+  if (nav) { resize(); if (!me) fitRoute(); drawProfile(); } else { if ($('nav').classList.contains('full')) setFull(false); stopSim(); hush(); stopGps(); checkOffline(); }
 }
 $('startBtn').onclick = () => { unlockAudio(); show(true); history.pushState({nav: 1}, ''); };
 $('backBtn').onclick = () => history.back();
@@ -926,7 +938,7 @@ const favRoute = () => ({k: FOLDER + '/ruta-' + RID, kind: 'ruta', n: D.route.na
   POIS.forEach(p => { const s = snap([p.x, p.y]); p.along = s.along; p.off = s.off; });
   POIS.sort((a, b) => a.along - b.along);
   let num = 0; POIS.forEach(p => { if (!isInfo(p) && !isTreasure(p)) p.num = ++num; }); // numbered in walking order; information points and treasures apart
-  buildLayers(); renderHome(); updateTreasures(); updateNext(0, NaN);
+  buildLayers(); renderHome(); updateTreasures(); updateNext(POIS.findIndex(p => !isInfo(p)), NaN);
   NLM.heart($('rFav'), favRoute, {icon: true});
   $('rShare').onclick = () => NLM.share(D.route.name, new URL(IN_DEST ? `../../fitxa/ruta-${RID}/` : './', location.href).href, $('rShare'));
   buildClimb();

@@ -94,7 +94,7 @@ function prepare() {
     ...D.S.map(s => ({...s, g: svc(s.cat)})),
   ].map((it, i) => {
     it.i = i; [it.x, it.y] = toXY(it.lat, it.lon);
-    if (it.trk) { it.tr = it.trk.map(p => toXY(p[0], p[1])); it.cum = [0]; for (let k = 1; k < it.tr.length; k++) it.cum.push(it.cum[k - 1] + dist(it.tr[k - 1], it.tr[k])); it.len = it.cum[it.cum.length - 1]; }
+    if (it.trk && it.trk.length > 1) { it.tr = it.trk.map(p => toXY(p[0], p[1])); it.cum = [0]; for (let k = 1; k < it.tr.length; k++) it.cum.push(it.cum[k - 1] + dist(it.tr[k - 1], it.tr[k])); it.len = it.cum[it.cum.length - 1]; }
     return it;
   });
 }
@@ -157,7 +157,7 @@ function renderGuide() {
       ? `<p class="rf-note">Amb filtres. <button class="small" data-rf="edit">Canvia'ls</button> <button class="small" data-rf="clear">Treu-los</button></p>` : ''}<ul class="cards">${list.map(it => {
       const th = it.pics[0] ? `<span class="thw"><img src="${it.pics[0][0]}" alt="" loading="lazy"><span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 13)}</span></span>`
         : `<span class="ph" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 32)}</span>`;
-      const sub = it.g === 'ruta' ? [it.mo === 'bici' && 'En bici', it.km + ' km', it.mo === 'bici' ? it.durBici : it.dur, it.df || it.dif].filter(Boolean).join(' · ') : plain(it.desc[0] || '').slice(0, 70) + '…';
+      const sub = it.g === 'ruta' ? [it.mo === 'bici' && 'En bici', it.km && it.km + ' km', it.mo === 'bici' ? it.durBici : it.dur, it.df || it.dif].filter(Boolean).join(' · ') : plain(it.desc[0] || '').slice(0, 70) + '…';
       return `<li><button data-i="${it.i}">${th}<span><small>${esc(catLabel(it))}</small><b>${esc(it.n)}</b><span class="sub">${esc(sub)}</span></span><span class="chev">›</span></button></li>`;
     }).join('')}</ul>`;
   };
@@ -200,13 +200,13 @@ function openSheet(i) {
   $('shTheme').innerHTML = `<span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span><span>${esc(catLabel(it))}</span>${it.mun ? ' · ' + esc([...new Set([it.mun, ...(it.muns || [])])].slice(0, 3).join(', ')) : ''}`;
   $('shDist').textContent = me ? 'A ' + fmtM(dist([me.x, me.y], [it.x, it.y])) + ' de tu' : '';
   $('shTitle').textContent = it.n;
-  const facts = it.g === 'ruta' ? [['Distància', it.km + ' km'], ['Durada a peu', it.dur], ['Durada en bici', it.durBici], ['Desnivell', it.des], ['Dificultat', it.dif], ['Dificultat en bici', it.difBici !== it.dif && it.difBici], ['Tipologia', it.tip], ['Temàtica', it.tema]].filter(f => f[1]) : [];
+  const facts = it.g === 'ruta' ? [['Distància', it.km && it.km + ' km'], ['Durada a peu', it.dur], ['Durada en bici', it.durBici], ['Desnivell', it.des], ['Dificultat', it.dif], ['Dificultat en bici', it.difBici !== it.dif && it.difBici], ['Tipologia', it.tip], ['Temàtica', it.tema]].filter(f => f[1]) : [];
   $('shFacts').innerHTML = facts.map(([k, v]) => `<div${k === 'Temàtica' ? ' class="wide"' : ''}><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
   const acts = [];
   // routes with their own route app (points of interest, download): link to it; otherwise, the simple navigation here
   if (it.app) acts.push(`<a class="btn primary grow" href="${it.app}">Navega la ruta</a>`,
     `<a class="btn grow dl" href="${it.app}#descarrega">⬇ Descarrega-la per anar sense cobertura${it.mb ? ` (uns ${it.mb} MB)` : ''}</a><p class="appnote">${it.pts} punts d'interès.</p>`);
-  else if (it.g === 'ruta') acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
+  else if (it.g === 'ruta' && it.tr) acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
   if (it.tel) acts.push(`<a class="btn" href="tel:${esc(it.tel)}">📞 Truca</a>`);
   acts.push(`<button id="aMap">Veure al mapa</button>`);
   if (it.url) acts.push(`<a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Veure la fitxa a Natura Local ↗</a>`);
@@ -265,7 +265,7 @@ async function share(title, url, btn) {
     const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select();
     try { ok = document.execCommand('copy'); } catch (e2) {} t.remove();
   }
-  if (btn.classList.contains('hero-btn')) { const old = btn.innerHTML; btn.innerHTML = ok ? '✓' : '!'; btn.title = ok ? 'Enllaç copiat ✓' : url; setTimeout(() => { btn.innerHTML = old; btn.title = 'Comparteix'; }, 2000); return; }
+  if (btn.classList.contains('hero-btn')) { const old = btn.innerHTML; btn.innerHTML = ok ? '✓' : '!'; const T = window.NLM ? NLM.T : x => x; btn.title = ok ? T('Enllaç copiat ✓') : url; setTimeout(() => { btn.innerHTML = old; btn.title = T('Comparteix'); }, 2000); return; }
   const old = btn.textContent; btn.textContent = ok ? 'Enllaç copiat ✓' : url; setTimeout(() => { btn.textContent = old; }, ok ? 2000 : 8000);
 }
 function fromHash(h) { // #ruta-123, #visita-123, #servei-123; and the old #123 (route first), still used by the route apps
@@ -274,7 +274,7 @@ function fromHash(h) { // #ruta-123, #visita-123, #servei-123; and the old #123 
   return ITEMS.find(i => i.g === 'ruta' && String(i.id) === h) || ITEMS.find(i => String(i.id) === h);
 }
 function restoreView() {
-  const id = decodeURIComponent(location.hash.slice(1)); if (!id) return;
+  let id = ''; try { id = decodeURIComponent(location.hash.slice(1)); } catch (e) {} if (!id) return;
   history.replaceState(null, '', location.pathname + location.search);
   if (id === 'desti') { showTab(false); return; } // the shared destination: its guide
   let v = null; try { v = JSON.parse(sessionStorage.getItem('tpnl-desti-vista')); } catch (e) {}
@@ -375,7 +375,7 @@ function paint() {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   // routes: all thin when routes are shown, the selected one gold with direction arrows
   // while navigating, the other routes are hidden so the map stays clean
-  const routes = nav ? [] : ITEMS.filter(i => i.g === 'ruta' && shown(i));
+  const routes = nav ? [] : ITEMS.filter(i => i.g === 'ruta' && i.tr && shown(i));
   for (const r of routes) if (r !== sel) { pathOf(r.tr); ctx.strokeStyle = '#fffd'; ctx.lineWidth = 6.5; ctx.stroke(); ctx.strokeStyle = r.col; ctx.lineWidth = 3.5; ctx.stroke(); }
   if (sel && sel.tr) {
     pathOf(sel.tr); ctx.strokeStyle = '#fff'; ctx.lineWidth = 11; ctx.stroke(); ctx.strokeStyle = sel.col; ctx.lineWidth = 6.5; ctx.stroke();
@@ -406,6 +406,7 @@ function paint() {
   }
 }
 function fit(pts, pad = 60) {
+  if (!pts || !pts.length) return;
   let x0 = 1e12, x1 = -1e12, y0 = 1e12, y1 = -1e12;
   for (const p of pts) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
   view.cx = (x0 + x1) / 2; view.cy = (y0 + y1) / 2;
@@ -448,9 +449,9 @@ function tapAt(x, y) {
 function showPop(it) {
   sel = it; const p = $('pop');
   const d = me ? ' · a ' + fmtM(dist([me.x, me.y], [it.x, it.y])) : '';
-  const txt = it.g === 'ruta' ? [it.mo === 'bici' && 'En bici', it.km + ' km', it.mo === 'bici' ? it.durBici : it.dur, it.des, it.df || it.dif].filter(Boolean).join(' · ') : plain(it.desc[0] || '').slice(0, 140);
+  const txt = it.g === 'ruta' ? [it.mo === 'bici' && 'En bici', it.km && it.km + ' km', it.mo === 'bici' ? it.durBici : it.dur, it.des, it.df || it.dif].filter(Boolean).join(' · ') : plain(it.desc[0] || '').slice(0, 140);
   p.innerHTML = `<span class="t"><span class="dot" style="background:${colOf(it)}">${svgIcon(iconOf(it), '#fff', 12)}</span><span>${esc(catLabel(it))}</span>${d}</span><h3>${esc(it.n)}</h3>${txt ? `<p>${esc(txt)}</p>` : ''}
-    <div class="row"><button class="primary grow" id="pMore">Més informació ›</button>${it.app ? `<a class="btn" href="${it.app}">Navega</a>` : it.g === 'ruta' ? '<button id="pNav">Navega</button>' : ''}<button id="pClose" aria-label="Tanca">×</button></div>`;
+    <div class="row"><button class="primary grow" id="pMore">Més informació ›</button>${it.app ? `<a class="btn" href="${it.app}">Navega</a>` : it.g === 'ruta' && it.tr ? '<button id="pNav">Navega</button>' : ''}<button id="pClose" aria-label="Tanca">×</button></div>`;
   p.hidden = nav != null;
   $('pMore').onclick = () => openSheet(it.i);
   if ($('pNav')) $('pNav').onclick = () => startNav(it);
@@ -501,7 +502,7 @@ function startNav(it) {
   $('progBar').style.width = '0'; $('sDone').textContent = '0 m'; $('sLeft').textContent = fmtM(it.len); $('sOff').textContent = '–';
   requestAnimationFrame(() => { fit(it.tr, 40); startGps(); follow = true; $('meBtn').setAttribute('aria-pressed', true); });
 }
-$('navStop').onclick = () => { nav = null; stopSim(); $('navBar').hidden = true; $('offroute').hidden = true; walked = 0; if (sel) showPop(sel); };
+$('navStop').onclick = () => { nav = null; stopSim(); if (gpsWatch != null) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; } $('navBar').hidden = true; $('offroute').hidden = true; walked = 0; if (sel) showPop(sel); };
 function stopSim() { if (simTimer) { clearInterval(simTimer); simTimer = null; } }
 $('simBtn').onclick = () => simTimer ? stopSim() : simulate();
 // Walks the route by itself (4× walking speed), to try the navigation at home.
@@ -519,7 +520,7 @@ NLM.init({root: '../'}); // the ☰ menu (O-066): favourites, downloaded routes,
   try { D = await fetch('data.json').then(r => r.json()); }
   catch (e) { document.body.insertAdjacentHTML('beforeend', '<p class="miss pad">No s\'han pogut carregar les dades. Obre-la amb connexió la primera vegada.</p>'); return; }
   prepare(); for (const it of ITEMS) byName[it.n] = it;
-  setLayer('osm');
+  setLayer(navigator.onLine ? 'osm' : 'topo'); // offline: OSM tiles are never saved (their policy), the ICGC ones seen are (audit 23/11/2026)
   $('dName').textContent = D.D.nom; document.title = 'Natura Local · ' + D.D.nom;
   gallery($('dGal'), D.D.pics); setDots($('dDots'), D.D.pics.length); arrows($('dGal'), D.D.pics.length);
   $('dShare').onclick = () => share(D.D.nom, destUrl(), $('dShare'));
