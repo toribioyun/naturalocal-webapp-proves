@@ -16,7 +16,7 @@ const NLM = (() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   const cfg = () => ({lang: 'ca', off: true, prox: true, so: true, vib: true, ...get(CFG, {})});
   const setCfg = (k, v) => { const c = cfg(); c[k] = v; put(CFG, c); };
-  let ROOT = './', onFavMap = null, el = null, view = 'main';
+  let ROOT = './', onFavMap = null, el = null, view = 'main', onDlMap = null;
 
   /* ---------- favourites ---------- */
   // item: {k: '<destination folder>/<kind>-<id>' or '<folder>/desti', kind, n, d (destination name), foto (from the root), lat, lon}
@@ -137,7 +137,7 @@ html:not([lang=ca]) .facts{grid-template-columns:repeat(2,1fr)} /* other languag
 .mn-empty{padding:18px;color:var(--muted,#6f675e)}`;
 
   function init(o) {
-    ROOT = o.root || './'; onFavMap = o.onFavMap || null;
+    ROOT = o.root || './'; onFavMap = o.onFavMap || null; onDlMap = o.onDlMap || null;
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     const bar = document.querySelector(o.bar || '.appbar');
     if (bar) {
@@ -176,7 +176,7 @@ html:not([lang=ca]) .facts{grid-template-columns:repeat(2,1fr)} /* other languag
         : `<p class="mn-empty">${T('Encara no tens cap favorit.')}<br>${T('Toca ♡ a la fitxa d’un destí, una ruta, una visita o un servei per tenir-lo aquí.')}</p>`) + '</div>';
     } else if (view === 'dl') {
       const D = await downloads();
-      h = top('Rutes descarregades', true) + `<div class="mn-body">` + (D.length ? D.map(r => `<div class="mn-card"><a href="${esc(ROOT + r.href)}">${r.foto ? `<img src="${esc(ROOT + r.foto)}" alt="" loading="lazy">` : '<span class="ph"></span>'}
+      h = top('Rutes descarregades', true) + `<div class="mn-body">` + (D.length ? `<div class="mn-seg"><button aria-pressed="true">${T('Llista')}</button><button data-dlmap>${svg('map', 18)} ${T('Mapa')}</button></div>` + D.map(r => `<div class="mn-card"><a href="${esc(ROOT + r.href)}">${r.foto ? `<img src="${esc(ROOT + r.foto)}" alt="" loading="lazy">` : '<span class="ph"></span>'}
           <span><small>${esc(r.d || '')}${r.mb ? ` · ${r.mb} MB` : ''}</small><b>${esc(r.n)}</b></span></a><button data-undl="${esc(r.id)}">${T('Esborra')}</button></div>`).join('')
         : `<p class="mn-empty">${T('Encara no has descarregat cap ruta.')}<br>${T('Obre una ruta i toca «Descarrega-la per anar sense cobertura».')}</p>`) + '</div>';
     } else if (view === 'cfg') {
@@ -198,11 +198,14 @@ html:not([lang=ca]) .facts{grid-template-columns:repeat(2,1fr)} /* other languag
     el.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { if (b.dataset.lang === cfg().lang) return; setCfg('lang', b.dataset.lang); location.reload(); });
     const m = el.querySelector('[data-favmap]');
     if (m) m.onclick = () => { close(); if (onFavMap) onFavMap(); else location.href = ROOT + '#favorits'; };
+    const dm = el.querySelector('[data-dlmap]');
+    if (dm) dm.onclick = () => { close(); if (onDlMap) onDlMap(); else location.href = ROOT + '#descarregades'; };
   }
   async function share(title, url, btn) {
     if (navigator.share) { try { await navigator.share({title, text: title + ' · Natura Local', url}); } catch (e) {} return; }
     let ok = false; try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {}
     const old = btn.innerHTML; btn.innerHTML = ok ? '✓' : '!'; btn.title = ok ? T('Enllaç copiat ✓') : url; setTimeout(() => { btn.innerHTML = old; btn.title = T('Comparteix'); }, 2000);
   }
-  return {share, init, heart, isFav, favs, toggle, cfg, T, markDownloaded, unmarkDownloaded, open};
+  const isDownloaded = id => !!get(DL, {})[id];
+  return {share, init, heart, isFav, favs, toggle, cfg, T, markDownloaded, unmarkDownloaded, isDownloaded, downloads, open};
 })();

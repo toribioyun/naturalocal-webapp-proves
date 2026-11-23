@@ -205,7 +205,7 @@ function openSheet(i) {
   const acts = [];
   // routes with their own route app (points of interest, download): link to it; otherwise, the simple navigation here
   if (it.app) acts.push(`<a class="btn primary grow" href="${it.app}">Navega la ruta</a>`,
-    `<a class="btn grow dl" href="${it.app}#descarrega">⬇ Descarrega-la per anar sense cobertura${it.mb ? ` (uns ${it.mb} MB)` : ''}</a><p class="appnote">${it.pts} punts d'interès.</p>`);
+    dlCard(it));
   else if (it.g === 'ruta' && it.tr) acts.push(`<button class="primary grow" id="aNav">Navega la ruta</button>`);
   if (it.tel) acts.push(`<a class="btn" href="tel:${esc(it.tel)}">📞 Truca</a>`);
   acts.push(`<button id="aMap">Veure al mapa</button>`);
@@ -265,7 +265,7 @@ async function share(title, url, btn) {
     const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select();
     try { ok = document.execCommand('copy'); } catch (e2) {} t.remove();
   }
-  if (btn.classList.contains('hero-btn')) { const old = btn.innerHTML; btn.innerHTML = ok ? '✓' : '!'; const T = window.NLM ? NLM.T : x => x; btn.title = ok ? T('Enllaç copiat ✓') : url; setTimeout(() => { btn.innerHTML = old; btn.title = T('Comparteix'); }, 2000); return; }
+  if (btn.classList.contains('hero-btn')) { const old = btn.innerHTML; btn.innerHTML = ok ? '✓' : '!'; const T = typeof NLM !== 'undefined' ? NLM.T : x => x; btn.title = ok ? T('Enllaç copiat ✓') : url; setTimeout(() => { btn.innerHTML = old; btn.title = T('Comparteix'); }, 2000); return; }
   const old = btn.textContent; btn.textContent = ok ? 'Enllaç copiat ✓' : url; setTimeout(() => { btn.textContent = old; }, ok ? 2000 : 8000);
 }
 function fromHash(h) { // #ruta-123, #visita-123, #servei-123; and the old #123 (route first), still used by the route apps
@@ -503,6 +503,14 @@ function startNav(it) {
   requestAnimationFrame(() => { fit(it.tr, 40); startGps(); follow = true; $('meBtn').setAttribute('aria-pressed', true); });
 }
 $('navStop').onclick = () => { nav = null; stopSim(); if (gpsWatch != null) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; } $('navBar').hidden = true; $('offroute').hidden = true; walked = 0; if (sel) showPop(sel); };
+// The download card of a route sheet (O-077, 23/11/2026): icon, what it does, size and points; «Descarregada» when it is.
+const DL_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3v11m0 0-4.5-4.5M12 14l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function dlCard(it) {
+  const on = !!(typeof NLM !== 'undefined' && NLM.isDownloaded && NLM.isDownloaded(it.id));
+  const sub = [on ? 'La pots fer sense cobertura' : 'Per anar sense cobertura', !on && it.mb ? `uns ${it.mb} MB` : '', it.pts ? `${it.pts} punts d'interès` : ''].filter(Boolean);
+  return `<a class="dlcard${on ? ' on' : ''}" href="${it.app}#descarrega"><span class="dlic">${on ? '✓' : DL_SVG}</span>`
+    + `<span class="dltx"><b>${on ? 'Descarregada' : 'Descarrega la ruta'}</b><small>${sub.map(t => `<span>${t}</span>`).join(' · ')}</small></span><span class="chev">›</span></a>`;
+}
 function stopSim() { if (simTimer) { clearInterval(simTimer); simTimer = null; } }
 $('simBtn').onclick = () => simTimer ? stopSim() : simulate();
 // Walks the route by itself (4× walking speed), to try the navigation at home.
