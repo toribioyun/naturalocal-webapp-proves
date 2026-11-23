@@ -1,6 +1,6 @@
 // Service worker of the Girona destination prototype (built by portal/scripts/genera.py). VERSION is set by portal/scripts/genera.py (hash of the app files).
 // App and data are saved on install; photos and ICGC map tiles (zoom ≤ 16) are saved as they are seen.
-const VERSION = 'bb3d86e4b2';
+const VERSION = '5c16fac801';
 const SHELL = 'tpnlgi-shell-' + VERSION, SEEN = 'tpnlgi-vist';
 const SHELL_FILES = ['./', 'index.html', 'desti.js', 'style.css', 'manifest.webmanifest', 'icones.js', 'filtre.js', 'idiomes.js', 'menu.js', 'icon-192.png', 'icon-512.png',
   'logo.svg', 'fulla.svg', 'fonts/raleway-latin.woff2', 'fonts/raleway-latin-ext.woff2', 'data.json'];
