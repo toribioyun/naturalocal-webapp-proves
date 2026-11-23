@@ -243,6 +243,9 @@ function setMode(m, refit) {
   mode = m; $('mDest').setAttribute('aria-pressed', m === 'dest'); $('mRut').setAttribute('aria-pressed', m === 'rut'); $('mFav').setAttribute('aria-pressed', m === 'fav'); syncFavChip();
   $('fBtn').hidden = m !== 'rut'; $('fBtn').innerHTML = FUNNEL + RF.label(); $('fBtn').setAttribute('aria-pressed', RF.count() > 0);
   hidePop(); renderCards();
+  const ph = m === 'dest' ? 'Cerca un poble o un destí' : m === 'rut' ? 'Cerca una ruta o un poble' : 'Cerca un poble, una ruta o un lloc';
+  $('q').placeholder = NLM.T(ph); $('q').setAttribute('aria-label', NLM.T(ph));
+  if (!$('results').hidden) renderResults();
   if (refit) { const pts = m === 'fav' ? favList().map(f => [f.lat, f.lon]) : m === 'rut' ? routes().map(i => [i.lat, i.lon]) : DATA.D.map(d => [d.lat, d.lon]); if (pts.length) fit(pts, 60, m === 'fav' ? 14 : 12); }
   draw(); remember();
 }
@@ -296,8 +299,15 @@ function search(q) {
   // a place matches by its name or by its name and its town together («ermita mataro»); the name alone ranks first
   // a place needs at least one word of its own name: the town alone does not list all its places
   const items = DATA.I.filter(it => hit(it.n + ' ' + destOf(it.c).n + ' ' + (destOf(it.c).nc || '') + ' ' + (it.m || '')) && words.some(w => fold(it.n).includes(w))).map(it => ({it, rank: starts(it.n) + (it.g === 'ruta' ? 0 : 0.5) + (hit(it.n) ? 0 : 2)}));
+  // Each result in its own place (Juanjo, 23/11/2026): «Destins» lists only destinations, «Rutes» only routes (those of
+  // the filter, also found by their town: «Gualba» lists the routes of Gualba). Favourites keep the whole search.
+  const byName = (a, b) => a.rank - b.rank || (a.it ? a.it.n.localeCompare(b.it.n, 'ca') : 0);
+  if (mode === 'dest') return towns.sort(byName).slice(0, 40);
+  if (mode === 'rut') return routes().filter(it => hit(it.n + ' ' + destOf(it.c).n + ' ' + (destOf(it.c).nc || '') + ' ' + (it.m || ''))).map(it => ({it, rank: starts(it.n) + (hit(it.n) ? 0 : 2)})).sort(byName).slice(0, 40);
   return [...towns.sort((a, b) => a.rank - b.rank), ...items.sort((a, b) => a.rank - b.rank || a.it.n.localeCompare(b.it.n, 'ca'))].slice(0, 40);
 }
+// What the other mode would find, to offer it when this one finds nothing («Can Mata» in «Destins» → 2 routes)
+function otherHits(q) { const keep = mode; mode = keep === 'dest' ? 'rut' : 'dest'; const n = search(q).length; mode = keep; return n; }
 function renderResults() {
   const q = $('q').value; $('qClear').hidden = !q;
   if (q.trim().length < 2) { hideResults(); return; }
@@ -305,12 +315,18 @@ function renderResults() {
   $('results').innerHTML = res.length ? res.map((r, k) => r.d
     ? `<button class="res" data-k="${k}"><span class="pdot town"></span><span><b>${esc(r.d.n)}</b><small>${r.d.parc ? 'Parc' : 'Destí'} · ${r.d.nR} rutes${r.via ? ' · inclou ' + esc(r.via) : ''}</small></span></button>`
     : `<button class="res" data-k="${k}"><span class="pdot" style="background:${GROUPS[r.it.g].col}"></span><span><b>${esc(r.it.n)}</b><small>${GROUPS[r.it.g].label} · ${esc(short(destOf(r.it.c)))}${r.it.m ? ' · ' + esc(r.it.m.split(', ')[0]) : ''}</small></span></button>`).join('')
-    : '<p class="none">No hi ha res amb aquest nom en aquests destins.</p>';
+    : noneMsg(q);
   $('results').hidden = false;
-  $('results').querySelectorAll('.res').forEach(b => b.onclick = () => {
+  const sw = $('results').querySelector('.res-switch'); if (sw) sw.onclick = () => { setMode(mode === 'dest' ? 'rut' : 'dest', false); renderResults(); $('q').focus(); };
+  $('results').querySelectorAll('.res:not(.res-switch)').forEach(b => b.onclick = () => {
     const r = res[+b.dataset.k]; hideResults(); $('q').blur();
     if (r.d) selectDest(r.d, true); else { showPop(r.it); flyTo(r.it.lat, r.it.lon, Math.max(view.z, 14)); }
   });
+}
+function noneMsg(q) {
+  const none = mode === 'dest' ? 'No hi ha cap destí amb aquest nom.' : mode === 'rut' ? (RF.count() ? 'Amb aquest filtre no hi ha cap ruta amb aquest nom.' : 'No hi ha cap ruta amb aquest nom.') : 'No hi ha res amb aquest nom.';
+  const n = mode === 'fav' ? 0 : otherHits(q), other = mode === 'dest' ? (n === 1 ? '1 ruta' : n + ' rutes') : (n === 1 ? '1 destí' : n + ' destins');
+  return `<p class="none">${none}</p>` + (n ? `<button class="res res-switch"><span class="pdot${mode === 'dest' ? '' : ' town'}"${mode === 'dest' ? ' style="background:#69920c"' : ''}></span><span><b>Mira-ho a «${mode === 'dest' ? 'Rutes' : 'Destins'}»</b><small>Hi ha ${other} amb aquest nom</small></span></button>` : '');
 }
 function hideResults() { $('results').hidden = true; }
 $('q').addEventListener('input', renderResults);

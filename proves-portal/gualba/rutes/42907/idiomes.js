@@ -58,6 +58,14 @@ const NL_I18N = {
   'Què vols veure': ['Qué quieres ver', 'What do you want to see', 'Que voulez-vous voir', 'Was möchtest du sehen'],
   'Què vols veure al mapa': ['Qué quieres ver en el mapa', 'Show on map', 'Que voir sur la carte', 'Auf der Karte anzeigen'],
   'Cerca un poble, una ruta o un lloc': ['Busca un pueblo, una ruta o un lugar', 'Search for a town, route or place', 'Rechercher un village, un itinéraire ou un lieu', 'Ort, Route oder Ziel suchen'],
+  'Cerca un poble o un destí': ['Busca un pueblo o un destino', 'Search for a town or destination', 'Rechercher un village ou une destination', 'Ort oder Reiseziel suchen'],
+  'Cerca una ruta o un poble': ['Busca una ruta o un pueblo', 'Search for a route or town', 'Rechercher un itinéraire ou un village', 'Route oder Ort suchen'],
+  'No hi ha cap destí amb aquest nom.': ['No hay ningún destino con este nombre.', 'No destination with this name.', 'Aucune destination portant ce nom.', 'Kein Reiseziel mit diesem Namen.'],
+  'No hi ha cap ruta amb aquest nom.': ['No hay ninguna ruta con este nombre.', 'No route with this name.', 'Aucun itinéraire portant ce nom.', 'Keine Route mit diesem Namen.'],
+  'Amb aquest filtre no hi ha cap ruta amb aquest nom.': ['Con este filtro no hay ninguna ruta con este nombre.', 'No route with this name matches the filter.', 'Aucun itinéraire portant ce nom ne correspond au filtre.', 'Keine Route mit diesem Namen passt zum Filter.'],
+  'No hi ha res amb aquest nom.': ['No hay nada con este nombre.', 'Nothing with this name.', 'Rien ne porte ce nom.', 'Nichts mit diesem Namen.'],
+  'Mira-ho a «Rutes»': ['Míralo en «Rutas»', 'See it in “Routes”', 'Voir dans « Itinéraires »', 'Unter „Routen“ ansehen'],
+  'Mira-ho a «Destins»': ['Míralo en «Destinos»', 'See it in “Destinations”', 'Voir dans « Destinations »', 'Unter „Reiseziele“ ansehen'],
   'Esborra la cerca': ['Borrar búsqueda', 'Clear search', 'Effacer la recherche', 'Suche löschen'],
   'Resultats de la cerca': ['Resultados de la búsqueda', 'Search results', 'Résultats de la recherche', 'Suchergebnisse'],
   'Destins a prop meu': ['Destinos cerca de mí', 'Destinations near me', 'Destinations près de moi', 'Reiseziele in meiner Nähe'],
@@ -190,6 +198,10 @@ const NL_I18N = {
 };
 // Words with numbers: [pattern, es, en, fr, de] ($1, $2… are the numbers or names of the pattern)
 const NL_I18N_RE = [
+  [/^Hi ha (\d+) rutes amb aquest nom$/, 'Hay $1 rutas con este nombre', '$1 routes with this name', '$1 itinéraires portent ce nom', '$1 Routen mit diesem Namen'],
+  [/^Hi ha 1 ruta amb aquest nom$/, 'Hay 1 ruta con este nombre', '1 route with this name', '1 itinéraire porte ce nom', '1 Route mit diesem Namen'],
+  [/^Hi ha (\d+) destins amb aquest nom$/, 'Hay $1 destinos con este nombre', '$1 destinations with this name', '$1 destinations portent ce nom', '$1 Reiseziele mit diesem Namen'],
+  [/^Hi ha 1 destí amb aquest nom$/, 'Hay 1 destino con este nombre', '1 destination with this name', '1 destination porte ce nom', '1 Reiseziel mit diesem Namen'],
   [/^Mostra (\d+) rutes$/, 'Mostrar $1 rutas', 'Show $1 routes', 'Afficher $1 itinéraires', '$1 Routen anzeigen'],
   [/^Mostra 1 ruta$/, 'Mostrar 1 ruta', 'Show 1 route', 'Afficher 1 itinéraire', '1 Route anzeigen'],
   [/^Filtres · (\d+)$/, 'Filtros · $1', 'Filters · $1', 'Filtres · $1', 'Filter · $1'],
