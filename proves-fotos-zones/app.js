@@ -10,6 +10,9 @@ function avis(text, ms = 3200) {
 }
 
 let ruta = null;
+// D-175: publicació directa (model Wikiloc). Només les fitxes que paga un ajuntament passen per revisió.
+// Al prototip, ?ajuntament=1 simula una d'aquestes fitxes.
+const revisioPrevia = new URLSearchParams(location.search).get('ajuntament') === '1';
 /* Compartir: la foto va amb l'enllaç de la ruta, per portar-hi visites */
 async function comparteix(f) {
   const z = zones.perId[f.zona];
@@ -173,6 +176,7 @@ $('envia-ara').onclick = () => { $('envia').hidden = true; obrePublica([fotoNova
 let perPublicar = [];
 function obrePublica(llista, final) {
   perPublicar = llista;
+  $('pub-revisio').textContent = revisioPrevia ? 'No es veuran fins que les haguem revisades.' : 'Sortiran a la ruta de seguida, amb el teu nom.';
   $('avis').hidden = true;
   $('pub-t').textContent = final ? 'Has acabat la ruta!' : 'Publica la teva foto';
   $('pub-intro').textContent = final
@@ -199,9 +203,11 @@ $('pub-no').onclick = () => { $('publica').hidden = true; };
 $('envia-si').onclick = async () => {
   const ids = triades(), autor = $('envia-autor').value.trim();
   for (const f of perPublicar.filter(f => ids.includes(f.id)))
-    await Fotos.desa({ ...f, estat: 'pendent', autor, llicencia: 'CC BY 4.0', enviada: new Date().toISOString() });
+    await Fotos.desa({ ...f, estat: revisioPrevia ? 'pendent' : 'aprovada', autor, llicencia: 'CC BY 4.0', enviada: new Date().toISOString() });
   $('publica').hidden = true;
-  avis(ids.length > 1 ? `Enviades ${ids.length} fotos! Sortiran a la ruta quan les haguem revisades.` : 'Enviada! Sortirà a la ruta quan l\'haguem revisada.');
+  avis(revisioPrevia
+    ? (ids.length > 1 ? `Enviades ${ids.length} fotos! Sortiran a la ruta quan les haguem revisades.` : 'Enviada! Sortirà a la ruta quan l\'haguem revisada.')
+    : (ids.length > 1 ? `Publicades ${ids.length} fotos! Ja surten a la ruta.` : 'Publicada! Ja surt a la ruta.'));
   pinta();
 };
 $('acaba').onclick = async () => {

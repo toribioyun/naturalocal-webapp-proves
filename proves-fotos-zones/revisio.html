@@ -17,12 +17,12 @@
   <a class="cap-rev" href="index.html">‹ Mapa</a>
 </header>
 <main class="rev">
-  <p class="nota">Res no es veu a la ruta fins que s'aprova. Les persones hi poden sortir: qui publica declara que en té el permís i, si hi ha menors, que n'és el tutor o en té l'autorització. Rebutja les fotos amb menors en situacions íntimes o que els puguin perjudicar, nus, publicitat, les que no siguin de la ruta i les que algú que hi surt demani treure. En aquest prototip les fotos són només en aquest mòbil; amb Cloudinary aquesta llista serà la de tothom.</p>
+  <p class="nota">Model Wikiloc (D-175): les fotos es publiquen a l'instant i aquí es revisen les denunciades. Només les de les fitxes que paga un ajuntament esperen a «Pendents». Les persones hi poden sortir: qui publica declara que en té el permís i, si hi ha menors, que n'és el tutor o en té l'autorització. Retira les fotos amb menors en situacions íntimes o que els puguin perjudicar, nus, publicitat, les que no siguin de la ruta i les que algú que hi surt demani treure. En aquest prototip les fotos són només en aquest mòbil; amb Cloudinary aquesta llista serà la de tothom.</p>
   <h2>Pendents</h2>
   <div id="pend"></div>
   <h2>Denunciades</h2>
   <div id="den"></div>
-  <h2>Revisades</h2>
+  <h2>Publicades i rebutjades</h2>
   <div id="fet"></div>
   <p><button type="button" id="buida" class="b-sec" style="border:0;border-radius:10px;padding:8px 14px">Esborra totes les fotos de prova d'aquest mòbil</button></p>
 </main>
@@ -44,7 +44,7 @@ async function pinta() {
   const sec = (id, ll, botons) => $(id).innerHTML = ll.length ? ll.map(f => fitxa(f, botons)).join('') : '<p class="rev-buit">Cap.</p>';
   sec('pend', totes.filter(f => f.estat === 'pendent'), [['aprovada', 'Aprova', 'ok'], ['rebutjada', 'Rebutja', 'ko']]);
   sec('den', totes.filter(f => f.estat === 'denunciada'), [['aprovada', 'Torna-la a mostrar', 'ok'], ['rebutjada', 'Retira-la', 'ko']]);
-  sec('fet', totes.filter(f => f.estat === 'aprovada' || f.estat === 'rebutjada'), [['pendent', 'Torna a pendents', 'b-sec']]);
+  sec('fet', totes.filter(f => f.estat === 'aprovada' || f.estat === 'rebutjada'), [['rebutjada', 'Retira-la', 'ko'], ['pendent', 'Torna a pendents', 'b-sec']]);
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('button[data-id]'); if (!b) return;
