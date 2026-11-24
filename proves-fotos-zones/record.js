@@ -236,7 +236,7 @@ $('baixa').onclick = async () => {
   estat(`Vídeo fet (${(video.size / 1048576).toFixed(1).replace('.', ',')} MB). Si no s'ha baixat sol, prem «Comparteix».`);
 };
 $('comparteix').onclick = async () => {
-  const url = ruta.url + '?utm_source=record&utm_medium=compartir&utm_campaign=ruta-' + ruta.id;
+  const url = (ruta.urlApp || ruta.url) + '?utm_source=record&utm_medium=compartir&utm_campaign=ruta-' + ruta.id;
   const textC = `El meu record de la ${ruta.name} amb Natura Local. Fes-la tu també: ${url}`;
   try {
     if (video && navigator.canShare && navigator.canShare({ files: [video] })) await navigator.share({ files: [video], title: ruta.name, text: textC });

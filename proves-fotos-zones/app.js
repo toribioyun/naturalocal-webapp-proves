@@ -16,7 +16,8 @@ const revisioPrevia = new URLSearchParams(location.search).get('ajuntament') ===
 /* Compartir: la foto va amb l'enllaç de la ruta, per portar-hi visites */
 async function comparteix(f) {
   const z = zones.perId[f.zona];
-  const url = ruta.url + '?utm_source=fotos-visitants&utm_medium=compartir&utm_campaign=ruta-' + ruta.id;
+  // Enllaç a la ruta dins de la web app (la fitxa amb foto i previsualització), no a la web de Drupal
+  const url = (ruta.urlApp || ruta.url) + '?utm_source=fotos-visitants&utm_medium=compartir&utm_campaign=ruta-' + ruta.id;
   const text = `${z ? z.nom + ' · ' : ''}${ruta.name}. Fes-la tu també amb Natura Local: ${url}`;
   const fitxer = new File([f.blob], 'natura-local.jpg', { type: 'image/jpeg' });
   try {
@@ -188,17 +189,15 @@ function obrePublica(llista, final) {
     const z = zones.perId[f.zona];
     return `<label class="g-f"><input type="checkbox" value="${f.id}" checked ${final ? '' : 'hidden'}><img src="${u}" alt=""><span>${z ? z.nom : ''}</span></label>`;
   }).join('');
-  ['envia-cc', 'envia-pers'].forEach(id => $(id).checked = false);
   valida();
   $('publica').hidden = false;
 }
 function triades() { return [...$('pub-graella').querySelectorAll('input:checked')].map(c => c.value); }
 function valida() {
   const n = triades().length;
-  $('envia-si').disabled = !($('envia-cc').checked && $('envia-pers').checked && n);
+  $('envia-si').disabled = !n;   // les condicions s'accepten una sola vegada (Toribio, 24/11)
   $('envia-si').textContent = perPublicar.length > 1 ? `Publica ${n === 1 ? '1 foto' : n + ' fotos'}` : 'Publica';
 }
-['envia-cc', 'envia-pers'].forEach(id => $(id).addEventListener('change', valida));
 $('pub-graella').addEventListener('change', valida);
 $('pub-no').onclick = () => { $('publica').hidden = true; };
 /* Condicions legals: s'accepten la primera vegada que es publica (i de nou si canvia la versió).
