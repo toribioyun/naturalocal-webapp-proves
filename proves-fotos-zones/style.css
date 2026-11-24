@@ -49,6 +49,7 @@ button{font:inherit;cursor:pointer}
 .g-f input{position:absolute;top:6px;left:6px;width:22px;height:22px;margin:0;accent-color:var(--verd);z-index:1}
 .g-f:has(input:not(:checked)) img{opacity:.35}
 .car-den[hidden]{display:none}
+.comp{display:block;width:100%;margin-top:10px;padding:10px;border:1px solid var(--verd);background:#fff;color:var(--verd);border-radius:12px;font-weight:600}
 
 /* full d'enviament */
 .full{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}

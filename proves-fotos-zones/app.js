@@ -9,9 +9,24 @@ function avis(text, ms = 3200) {
   clearTimeout(avis.t); avis.t = setTimeout(() => a.hidden = true, ms);
 }
 
+let ruta = null;
+/* Compartir: la foto va amb l'enllaç de la ruta, per portar-hi visites */
+async function comparteix(f) {
+  const z = zones.perId[f.zona];
+  const url = ruta.url + '?utm_source=fotos-visitants&utm_medium=compartir&utm_campaign=ruta-' + ruta.id;
+  const text = `${z ? z.nom + ' · ' : ''}${ruta.name}. Fes-la tu també amb Natura Local: ${url}`;
+  const fitxer = new File([f.blob], 'natura-local.jpg', { type: 'image/jpeg' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [fitxer] })) await navigator.share({ files: [fitxer], title: ruta.name, text });
+    else if (navigator.share) await navigator.share({ title: ruta.name, text, url });
+    else { await navigator.clipboard.writeText(text); avis("Enllaç copiat. Enganxa'l on vulguis."); }
+  } catch (e) { if (e.name !== 'AbortError') avis("No s'ha pogut compartir des d'aquest navegador."); }
+}
+window.comparteix = comparteix;
+
 async function inicia() {
   const d = await (await fetch('dades/data.json')).json();
-  const r = d.route;
+  const r = d.route; ruta = r;
   $('titol').textContent = r.name;
   document.title = r.name + ' · fotos de visitants (prototip)';
   zones = zonesDeRuta(r.track, d.pois);
@@ -92,6 +107,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') $('car-ant').click();
   if (e.key === 'ArrowRight') $('car-seg').click();
 });
+$('car-comparteix').onclick = () => carLlista[carI] && comparteix(carLlista[carI]);
 $('car-denuncia').onclick = async () => {
   const f = carLlista[carI]; if (!f) return;
   await Fotos.estat(f.id, 'denunciada');
@@ -150,6 +166,7 @@ $('fitxer').onchange = async () => {
   pinta();
 };
 $('envia-no').onclick = () => { $('envia').hidden = true; avis('Desada. En acabar la ruta et preguntarem si la vols publicar.'); };
+$('envia-comp').onclick = () => comparteix(fotoNova);
 $('envia-ara').onclick = () => { $('envia').hidden = true; obrePublica([fotoNova], false); };
 
 /* ---------- Publicar (una ara, o les de la ruta en acabar) ---------- */
