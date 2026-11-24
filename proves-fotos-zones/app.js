@@ -27,6 +27,8 @@ async function inicia() {
     keyboard: false
   }).bindTooltip(p.name).addTo(mapa));
   capaCam = L.layerGroup().addTo(mapa);
+  mapa.on('click', clicMapa);
+  if (ultimaPos) posaJo(ultimaPos);
   await pinta();
 }
 
@@ -34,12 +36,12 @@ async function inicia() {
 async function pinta() {
   capaCam.clearLayers();
   const perZona = {};
-  (await Fotos.totes()).filter(f => f.estat === 'aprovada' || f.estat === 'pendent')
+  (await Fotos.totes()).filter(f => ['aprovada', 'pendent', 'meva'].includes(f.estat))
     .forEach(f => (perZona[f.zona] ||= []).push(f));
   Object.entries(perZona).forEach(([zid, llista]) => {
     const z = zones.perId[zid]; if (!z) return;
     llista.sort((a, b) => (a.estat === 'aprovada' ? 0 : 1) - (b.estat === 'aprovada' ? 0 : 1) || a.data.localeCompare(b.data));
-    const nomesPend = llista.every(f => f.estat === 'pendent');
+    const nomesPend = llista.every(f => f.estat !== 'aprovada');
     const m = L.marker(z.pos, {
       icon: L.divIcon({ className: 'cam' + (nomesPend ? ' cam-pend' : ''), iconSize: [38, 38], iconAnchor: [19, 50],
         html: `<div class="cam-b" role="button" aria-label="${llista.length} fotos: ${z.nom}">${ICONA_CAM}<span class="cam-n">${llista.length}</span></div>` }),
@@ -58,7 +60,7 @@ function obreCarrusel(z, llista) {
   $('car-t').textContent = z.nom;
   $('car-pista').innerHTML = llista.map((f, i) => {
     const u = URL.createObjectURL(f.blob); urls.push(u);
-    return `<div class="car-dia">${f.estat === 'pendent' ? '<span class="car-pend">Pendent de revisió · només la veus tu</span>' : ''}<img src="${u}" alt="Foto ${i + 1} de ${llista.length}: ${z.nom}"></div>`;
+    return `<div class="car-dia">${f.estat === 'pendent' ? '<span class="car-pend">Pendent de revisió · només la veus tu</span>' : f.estat === 'meva' ? '<span class="car-pend">No publicada · només la veus tu</span>' : ''}<img src="${u}" alt="Foto ${i + 1} de ${llista.length}: ${z.nom}"></div>`;
   }).join('');
   $('carrusel').hidden = false;
   $('car-pista').scrollLeft = 0;
@@ -67,8 +69,9 @@ function obreCarrusel(z, llista) {
 function peuCarrusel() {
   const f = carLlista[carI]; if (!f) return;
   const data = new Date(f.data).toLocaleDateString('ca', { day: 'numeric', month: 'long', year: 'numeric' });
-  $('car-credit').textContent = `Foto: ${f.autor || 'Visitant'} · CC BY 4.0 · ${data}`;
+  $('car-credit').textContent = f.estat === 'meva' ? `La teva foto · ${data}` : `Foto: ${f.autor || 'Visitant'} · CC BY 4.0 · ${data}`;
   $('car-num').textContent = `${carI + 1} / ${carLlista.length}`;
+  $('car-denuncia').hidden = f.estat !== 'aprovada';
   $('car-ant').style.visibility = carI > 0 ? 'visible' : 'hidden';
   $('car-seg').style.visibility = carI < carLlista.length - 1 ? 'visible' : 'hidden';
 }
@@ -97,52 +100,97 @@ $('car-denuncia').onclick = async () => {
   pinta();
 };
 
-/* ---------- Enviar una foto ---------- */
-let blobNet = null;
+/* ---------- Posició (només es fan fotos a la ruta) ---------- */
+let simula = false, puntJo = null;
+function posaJo(pos) {
+  ultimaPos = pos;
+  if (!mapa) return;
+  if (!puntJo) puntJo = L.circleMarker(pos, { radius: 8, color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1 }).addTo(mapa);
+  else puntJo.setLatLng(pos);
+}
+if (navigator.geolocation) navigator.geolocation.watchPosition(
+  p => { if (!simula) posaJo([p.coords.latitude, p.coords.longitude]); }, () => {},
+  { enableHighAccuracy: true, maximumAge: 5000 });
+$('simula').onclick = () => {
+  simula = !simula;
+  $('simula').setAttribute('aria-pressed', simula);
+  $('simula').textContent = simula ? 'Prova des de casa: toca el mapa per situar-te' : 'Prova des de casa';
+  if (simula) avis('Mode prova: toca el mapa on vols ser. Al mòbil real no cal.', 4500);
+};
+function clicMapa(e) { if (simula) posaJo([e.latlng.lat, e.latlng.lng]); }
+
+/* ---------- Fer una foto ---------- */
+let fotoNova = null;
 $('afegeix').onclick = () => {
+  const det = ultimaPos && zones.de(ultimaPos);
+  if (!det) {
+    avis(ultimaPos ? 'Només pots fer fotos mentre fas la ruta. Ara ets lluny del recorregut.'
+                   : 'Encara no sabem on ets. Activa la ubicació i torna-ho a provar.', 4500);
+    return;
+  }
+  zonaFoto = det.zona;
   $('fitxer').value = '';
   $('fitxer').click();
-  // demanem la posició ara, mentre es fa la foto; en acabar l'esperem com a molt 5 s més
-  ultimaPos = null;
-  posicio = new Promise(res => {
-    if (!navigator.geolocation) return res(null);
-    navigator.geolocation.getCurrentPosition(p => res([p.coords.latitude, p.coords.longitude]), () => res(null),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 20000 });
-  });
 };
-let posicio = Promise.resolve(null);
+let zonaFoto = null;
 
 $('fitxer').onchange = async () => {
-  const f = $('fitxer').files[0]; if (!f) return;
-  ultimaPos = await Promise.race([posicio, new Promise(r => setTimeout(() => r(null), 5000))]);
-  try { blobNet = await netejaFoto(f); }
-  catch { avis('No hem pogut llegir aquesta foto. Prova amb una altra.'); return; }
-  const u = URL.createObjectURL(blobNet); urls.push(u);
+  const f = $('fitxer').files[0]; if (!f || !zonaFoto) return;
+  let blob;
+  try { blob = await netejaFoto(f); }
+  catch { avis('No hem pogut llegir aquesta foto. Prova-ho una altra vegada.'); return; }
+  fotoNova = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), zona: zonaFoto.id,
+               data: new Date().toISOString(), estat: 'meva', blob };
+  await Fotos.desa(fotoNova);                 // es desa al mòbil: no es perd si no la publica
+  const u = URL.createObjectURL(blob); urls.push(u);
   $('envia-img').src = u;
-  const sel = $('envia-zona');
-  sel.innerHTML = '<option value="">— Tria on l\'has feta —</option>' +
-    '<optgroup label="Punts d\'interès">' + zones.llista.filter(z => z.id[0] === 'p').map(z => `<option value="${z.id}">${z.nom}</option>`).join('') + '</optgroup>' +
-    '<optgroup label="Trams de la ruta">' + zones.llista.filter(z => z.id[0] === 't').map(z => `<option value="${z.id}">${z.nom}</option>`).join('') + '</optgroup>';
-  const det = ultimaPos && zones.de(ultimaPos);
-  if (det) { sel.value = det.zona.id; $('envia-pos').textContent = 'Hem trobat la zona amb la teva posició. Si no és correcta, canvia-la.'; }
-  else { sel.value = ''; $('envia-pos').textContent = ultimaPos ? 'Ara no ets a la ruta: tria on vas fer la foto.' : 'No sabem on ets: tria on vas fer la foto.'; }
+  $('envia-zona').textContent = zonaFoto.nom;
+  $('avis').hidden = true;
+  $('envia').hidden = false;
+  pinta();
+};
+$('envia-no').onclick = () => { $('envia').hidden = true; avis('Desada. En acabar la ruta et preguntarem si la vols publicar.'); };
+$('envia-ara').onclick = () => { $('envia').hidden = true; obrePublica([fotoNova], false); };
+
+/* ---------- Publicar (una ara, o les de la ruta en acabar) ---------- */
+let perPublicar = [];
+function obrePublica(llista, final) {
+  perPublicar = llista;
+  $('avis').hidden = true;
+  $('pub-t').textContent = final ? 'Has acabat la ruta!' : 'Publica la teva foto';
+  $('pub-intro').textContent = final
+    ? `Vols publicar les teves fotos al recorregut de Natura Local? Treu la marca de les que no vulguis.`
+    : 'Sortirà al mapa de la ruta, al punt on l\'has feta.';
+  $('pub-graella').innerHTML = llista.map(f => {
+    const u = URL.createObjectURL(f.blob); urls.push(u);
+    const z = zones.perId[f.zona];
+    return `<label class="g-f"><input type="checkbox" value="${f.id}" checked ${final ? '' : 'hidden'}><img src="${u}" alt=""><span>${z ? z.nom : ''}</span></label>`;
+  }).join('');
   ['envia-cc', 'envia-pers'].forEach(id => $(id).checked = false);
   valida();
-  $('envia').hidden = false;
-};
-function valida() { $('envia-si').disabled = !($('envia-cc').checked && $('envia-pers').checked && $('envia-zona').value); }
-['envia-cc', 'envia-pers', 'envia-zona'].forEach(id => $(id).addEventListener('change', valida));
-$('envia-no').onclick = () => { $('envia').hidden = true; blobNet = null; };
+  $('publica').hidden = false;
+}
+function triades() { return [...$('pub-graella').querySelectorAll('input:checked')].map(c => c.value); }
+function valida() {
+  const n = triades().length;
+  $('envia-si').disabled = !($('envia-cc').checked && $('envia-pers').checked && n);
+  $('envia-si').textContent = perPublicar.length > 1 ? `Publica ${n === 1 ? '1 foto' : n + ' fotos'}` : 'Publica';
+}
+['envia-cc', 'envia-pers'].forEach(id => $(id).addEventListener('change', valida));
+$('pub-graella').addEventListener('change', valida);
+$('pub-no').onclick = () => { $('publica').hidden = true; };
 $('envia-si').onclick = async () => {
-  if (!blobNet) return;
-  await Fotos.desa({
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-    zona: $('envia-zona').value, autor: $('envia-autor').value.trim(),
-    data: new Date().toISOString(), estat: 'pendent', llicencia: 'CC BY 4.0', blob: blobNet
-  });
-  $('envia').hidden = true; blobNet = null;
-  avis('Enviada! Sortirà a la ruta quan l\'haguem revisada.');
+  const ids = triades(), autor = $('envia-autor').value.trim();
+  for (const f of perPublicar.filter(f => ids.includes(f.id)))
+    await Fotos.desa({ ...f, estat: 'pendent', autor, llicencia: 'CC BY 4.0', enviada: new Date().toISOString() });
+  $('publica').hidden = true;
+  avis(ids.length > 1 ? `Enviades ${ids.length} fotos! Sortiran a la ruta quan les haguem revisades.` : 'Enviada! Sortirà a la ruta quan l\'haguem revisada.');
   pinta();
+};
+$('acaba').onclick = async () => {
+  const meves = (await Fotos.totes()).filter(f => f.estat === 'meva').sort((a, b) => a.data.localeCompare(b.data));
+  if (!meves.length) { avis('Has acabat la ruta! No tens cap foto per publicar.'); return; }
+  obrePublica(meves, true);
 };
 
 inicia().catch(e => { $('titol').textContent = 'No s\'ha pogut carregar la ruta'; console.error(e); });

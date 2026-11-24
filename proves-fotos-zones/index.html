@@ -25,30 +25,45 @@
   <span><i class="ll-poi"></i> Punt d'interès</span>
 </div>
 
-<button id="afegeix" class="afegeix" type="button">
-  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l1.5 2H20a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-  Afegeix una foto
-</button>
+<div class="barra">
+  <button id="afegeix" class="afegeix" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l1.5 2H20a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+    Fes una foto
+  </button>
+  <button id="acaba" class="acaba" type="button">Acaba la ruta</button>
+</div>
+<button id="simula" class="simula" type="button" aria-pressed="false">Prova des de casa</button>
 <input id="fitxer" type="file" accept="image/*" capture="environment" hidden>
 
-<!-- Full per enviar una foto -->
+<!-- Full després de fer una foto -->
 <div id="envia" class="full" hidden>
   <div class="full-caixa" role="dialog" aria-modal="true" aria-labelledby="envia-t">
-    <h2 id="envia-t">Envia la teva foto</h2>
-    <img id="envia-img" alt="La foto que enviaràs">
-    <label class="camp">On l'has feta?
-      <select id="envia-zona"></select>
-    </label>
-    <p id="envia-pos" class="nota"></p>
+    <h2 id="envia-t">Foto feta</h2>
+    <img id="envia-img" alt="La foto que acabes de fer">
+    <p class="zona-t">📍 <span id="envia-zona"></span></p>
+    <p class="nota">La foto queda desada al teu mòbil. Pots publicar-la ara al recorregut de Natura Local o decidir-ho en acabar la ruta.</p>
+    <div class="botons">
+      <button type="button" id="envia-no" class="b-sec">Més tard</button>
+      <button type="button" id="envia-ara" class="b-pri">Publica-la ara</button>
+    </div>
+  </div>
+</div>
+
+<!-- Full per publicar (una foto ara, o les de la ruta en acabar) -->
+<div id="publica" class="full" hidden>
+  <div class="full-caixa" role="dialog" aria-modal="true" aria-labelledby="pub-t">
+    <h2 id="pub-t">Publica les teves fotos</h2>
+    <p id="pub-intro" class="nota"></p>
+    <div id="pub-graella" class="graella"></div>
     <label class="camp">Com vols sortir als crèdits? <span class="opc">(opcional)</span>
       <input id="envia-autor" type="text" maxlength="40" placeholder="Visitant">
     </label>
-    <label class="check"><input id="envia-cc" type="checkbox"> La foto és meva i la cedeixo a Natura Local amb llicència <a href="https://creativecommons.org/licenses/by/4.0/deed.ca" target="_blank" rel="noopener">CC BY 4.0</a>: sortirà amb el meu nom.</label>
-    <label class="check"><input id="envia-pers" type="checkbox"> No hi surten persones que es puguin reconèixer ni menors.</label>
-    <p class="nota">Abans d'enviar-la li traiem la ubicació exacta i les dades de la càmera. No es veurà fins que l'haguem revisada.</p>
+    <label class="check"><input id="envia-cc" type="checkbox"> <span>Les fotos són meves i les cedeixo a Natura Local amb llicència <a href="https://creativecommons.org/licenses/by/4.0/deed.ca" target="_blank" rel="noopener">CC BY 4.0</a>: sortiran amb el meu nom.</span></label>
+    <label class="check"><input id="envia-pers" type="checkbox"> <span>No hi surten persones que es puguin reconèixer ni menors.</span></label>
+    <p class="nota">Abans d'enviar-les els traiem la ubicació exacta i les dades de la càmera. No es veuran fins que les haguem revisades.</p>
     <div class="botons">
-      <button type="button" id="envia-no" class="b-sec">Cancel·la</button>
-      <button type="button" id="envia-si" class="b-pri" disabled>Envia</button>
+      <button type="button" id="pub-no" class="b-sec">Ara no</button>
+      <button type="button" id="envia-si" class="b-pri" disabled>Publica</button>
     </div>
   </div>
 </div>
