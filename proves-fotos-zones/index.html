@@ -61,10 +61,34 @@
     </label>
     <label class="check"><input id="envia-cc" type="checkbox"> <span>Les fotos són meves i les cedeixo a Natura Local amb llicència <a href="https://creativecommons.org/licenses/by/4.0/deed.ca" target="_blank" rel="noopener">CC BY 4.0</a>: sortiran amb el meu nom.</span></label>
     <label class="check"><input id="envia-pers" type="checkbox"> <span>Si hi surt algú que es pot reconèixer, té el seu permís per publicar-la. Si hi surt algun menor, en sóc el pare, la mare o el tutor legal, o en tinc l'autorització.</span></label>
+    <p class="nota">En publicar acceptes les <a href="#" id="obre-cond">condicions per publicar fotos</a>.</p>
     <p class="nota">Abans d'enviar-les els traiem la ubicació exacta i les dades de la càmera. <span id="pub-revisio"></span> Tu respons que les fotos són teves i que qui hi surt t'ha donat permís. Qui hi surti pot demanar que la traiem amb el botó «Denuncia».</p>
     <div class="botons">
       <button type="button" id="pub-no" class="b-sec">Ara no</button>
       <button type="button" id="envia-si" class="b-pri" disabled>Publica</button>
+    </div>
+    <a id="veure-record" class="comp" href="record.html" hidden>🎬 Mira el teu record de la ruta</a>
+  </div>
+</div>
+
+<!-- Condicions legals (esborrany, pendent de l'advocat: P-16) -->
+<div id="condicions" class="full" hidden>
+  <div class="full-caixa cond" role="dialog" aria-modal="true" aria-labelledby="cond-t">
+    <h2 id="cond-t">Condicions per publicar fotos</h2>
+    <ol>
+      <li><b>Les fotos han de ser teves.</b> Les publiques amb llicència <a href="https://creativecommons.org/licenses/by/4.0/deed.ca" target="_blank" rel="noopener">CC BY 4.0</a>: Natura Local i qualsevol persona les poden fer servir citant el teu nom.</li>
+      <li><b>Persones.</b> Si hi surt algú que es pot reconèixer, t'ha donat permís per publicar-la. Si hi surt un menor, n'ets el pare, la mare o el tutor legal, o en tens l'autorització. No publiquis cap imatge que pugui perjudicar ningú, i encara menys un menor.</li>
+      <li><b>No es pot publicar</b> publicitat, contingut ofensiu, violent o sexual, ni fotos que no siguin de la ruta.</li>
+      <li><b>Tu en respons.</b> La responsabilitat de cada foto és de qui la publica. Si algú reclama a Natura Local per una foto teva que no compleix aquestes condicions, en respondràs tu.</li>
+      <li><b>Natura Local només les allotja.</b> No les revisa abans de publicar-les, excepte a les fitxes municipals. Pot retirar qualsevol foto que no compleixi aquestes condicions, i la retirarà si ho demana algú que hi surt.</li>
+      <li><b>Denúncies.</b> Cada foto té un botó «Denuncia». La foto s'amaga mentre la revisem i, si en retirem una de teva, t'expliquem per què.</li>
+      <li><b>Privacitat.</b> Traiem la ubicació exacta i les dades de la càmera. Guardem la zona de la ruta, la data i el nom que triïs per als crèdits. Pots demanar que retirem les teves fotos quan vulguis. <i>[Responsable, contacte i política de privacitat: pendents.]</i></li>
+    </ol>
+    <p class="nota">Esborrany per al prototip, pendent de revisió jurídica (P-16). Versió 0, 24/11/2026.</p>
+    <label class="check"><input id="cond-accepto" type="checkbox"> <span>He llegit i accepto les condicions.</span></label>
+    <div class="botons">
+      <button type="button" id="cond-no" class="b-sec">Ara no</button>
+      <button type="button" id="cond-si" class="b-pri" disabled>Accepto i publica</button>
     </div>
   </div>
 </div>

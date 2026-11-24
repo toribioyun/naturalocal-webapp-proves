@@ -176,6 +176,7 @@ $('envia-ara').onclick = () => { $('envia').hidden = true; obrePublica([fotoNova
 let perPublicar = [];
 function obrePublica(llista, final) {
   perPublicar = llista;
+  $('veure-record').hidden = !final;
   $('pub-revisio').textContent = revisioPrevia ? 'No es veuran fins que les haguem revisades.' : 'Sortiran a la ruta de seguida, amb el teu nom.';
   $('avis').hidden = true;
   $('pub-t').textContent = final ? 'Has acabat la ruta!' : 'Publica la teva foto';
@@ -200,7 +201,25 @@ function valida() {
 ['envia-cc', 'envia-pers'].forEach(id => $(id).addEventListener('change', valida));
 $('pub-graella').addEventListener('change', valida);
 $('pub-no').onclick = () => { $('publica').hidden = true; };
-$('envia-si').onclick = async () => {
+/* Condicions legals: s'accepten la primera vegada que es publica (i de nou si canvia la versió).
+   Al prototip es desa al mòbil; a la versió real, l'acceptació (versió i data) es desarà al servidor com a prova. */
+const VERSIO_COND = 'v0-2026-11-24';
+const condAcceptades = () => { try { return JSON.parse(localStorage.getItem('nl-condicions-fotos') || '{}').versio === VERSIO_COND; } catch { return false; } };
+function obreCondicions(perPublicar) {
+  $('cond-accepto').checked = false; $('cond-si').disabled = true;
+  $('cond-si').hidden = !perPublicar; $('cond-accepto').parentElement.hidden = !perPublicar;
+  $('cond-no').textContent = perPublicar ? 'Ara no' : 'Tanca';
+  $('condicions').hidden = false;
+}
+$('cond-accepto').onchange = () => $('cond-si').disabled = !$('cond-accepto').checked;
+$('cond-no').onclick = () => { $('condicions').hidden = true; };
+$('cond-si').onclick = () => {
+  try { localStorage.setItem('nl-condicions-fotos', JSON.stringify({ versio: VERSIO_COND, data: new Date().toISOString() })); } catch { }
+  $('condicions').hidden = true; publica();
+};
+$('obre-cond').onclick = e => { e.preventDefault(); obreCondicions(false); };
+$('envia-si').onclick = () => condAcceptades() ? publica() : obreCondicions(true);
+async function publica() {
   const ids = triades(), autor = $('envia-autor').value.trim();
   for (const f of perPublicar.filter(f => ids.includes(f.id)))
     await Fotos.desa({ ...f, estat: revisioPrevia ? 'pendent' : 'aprovada', autor, llicencia: 'CC BY 4.0', enviada: new Date().toISOString() });
@@ -212,7 +231,7 @@ $('envia-si').onclick = async () => {
 };
 $('acaba').onclick = async () => {
   const meves = (await Fotos.totes()).filter(f => f.estat === 'meva').sort((a, b) => a.data.localeCompare(b.data));
-  if (!meves.length) { avis('Has acabat la ruta! No tens cap foto per publicar.'); return; }
+  if (!meves.length) { location.href = 'record.html'; return; }      // sense fotos per publicar: directe al record
   obrePublica(meves, true);
 };
 

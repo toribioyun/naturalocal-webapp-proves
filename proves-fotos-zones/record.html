@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>El teu record · prototip</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+<style>
+  html,body{background:#111;color:#fff}
+  .rec{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:12px 16px max(16px,env(safe-area-inset-bottom))}
+  .rec-cap{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .rec-cap a{color:#fff;font-size:14px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:5px 12px}
+  .rec-cap span{font-size:12px;opacity:.7}
+  .escena-caixa{position:relative;overflow:hidden;border-radius:14px;background:#1d2a20}
+  .escena{position:absolute;left:0;top:0;width:360px;height:640px;transform-origin:0 0}
+  #rmapa,#comp{position:absolute;inset:0;width:360px;height:640px}
+  #comp{z-index:2}
+  .rec-botons{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px;max-width:520px}
+  .rec-botons button{border:0;border-radius:999px;padding:11px 16px;font-weight:600}
+  .r-pri{background:var(--groc);color:var(--fosc)}
+  .r-sec{background:rgba(255,255,255,.14);color:#fff}
+  .rec-nota{max-width:520px;font-size:12.5px;opacity:.75;text-align:center;margin:10px 0 0}
+  .rec-estat{font-size:13px;margin-top:8px;min-height:18px;text-align:center}
+  button:disabled{opacity:.45}
+</style>
+</head>
+<body>
+<div class="rec">
+  <div class="rec-cap">
+    <a href="index.html">‹ Ruta</a>
+    <span>El teu record · prototip</span>
+  </div>
+  <div class="escena-caixa" id="caixa">
+    <div class="escena" id="escena">
+      <div id="rmapa"></div>
+      <canvas id="comp" width="720" height="1280" aria-label="Animació del recorregut amb les teves fotos"></canvas>
+    </div>
+  </div>
+  <div class="rec-estat" id="estat" role="status"></div>
+  <div class="rec-botons">
+    <button type="button" id="torna" class="r-sec" disabled>▶ Torna-ho a veure</button>
+    <button type="button" id="baixa" class="r-pri" disabled>Baixa el vídeo</button>
+    <button type="button" id="comparteix" class="r-sec" disabled>Comparteix</button>
+  </div>
+  <p class="rec-nota">El record es fa al teu mòbil amb les teves fotos d'aquesta ruta, publicades o no. No s'envia enlloc fins que tu el comparteixes. Baixar el vídeo és experimental: pot no funcionar en tots els mòbils.</p>
+</div>
+<div id="avis" class="avis" role="status" hidden></div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.min.js"></script>
+<script src="fotos.js"></script>
+<script src="record.js"></script>
+</body>
+</html>
