@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Revisió de fotos · prototip</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="cap">
+  <div>
+    <div class="cap-sub">Prototip · només per a Natura Local</div>
+    <h1>Revisió de fotos de visitants</h1>
+  </div>
+  <a class="cap-rev" href="index.html">‹ Mapa</a>
+</header>
+<main class="rev">
+  <p class="nota">Res no es veu a la ruta fins que s'aprova. Rebutja les fotos amb persones que es puguin reconèixer, menors, publicitat o que no siguin de la ruta. En aquest prototip les fotos són només en aquest mòbil; amb Cloudinary aquesta llista serà la de tothom.</p>
+  <h2>Pendents</h2>
+  <div id="pend"></div>
+  <h2>Denunciades</h2>
+  <div id="den"></div>
+  <h2>Revisades</h2>
+  <div id="fet"></div>
+  <p><button type="button" id="buida" class="b-sec" style="border:0;border-radius:10px;padding:8px 14px">Esborra totes les fotos de prova d'aquest mòbil</button></p>
+</main>
+<script src="fotos.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let zones;
+const fitxa = (f, botons) => {
+  const u = URL.createObjectURL(f.blob), z = zones.perId[f.zona];
+  return `<div class="rev-f"><img src="${u}" alt=""><div class="rev-d">
+    <b>${z ? z.nom : f.zona}</b>
+    <div>${f.autor || 'Visitant'} · ${f.llicencia} · ${new Date(f.data).toLocaleString('ca')}</div>
+    ${f.estat !== 'pendent' ? `<span class="rev-est est-${f.estat}">${f.estat}</span>` : ''}
+    <div class="rev-b">${botons.map(([e, t, c]) => `<button type="button" class="${c}" data-id="${f.id}" data-e="${e}">${t}</button>`).join('')}</div>
+  </div></div>`;
+};
+async function pinta() {
+  const totes = (await Fotos.totes()).sort((a, b) => b.data.localeCompare(a.data));
+  const sec = (id, ll, botons) => $(id).innerHTML = ll.length ? ll.map(f => fitxa(f, botons)).join('') : '<p class="rev-buit">Cap.</p>';
+  sec('pend', totes.filter(f => f.estat === 'pendent'), [['aprovada', 'Aprova', 'ok'], ['rebutjada', 'Rebutja', 'ko']]);
+  sec('den', totes.filter(f => f.estat === 'denunciada'), [['aprovada', 'Torna-la a mostrar', 'ok'], ['rebutjada', 'Retira-la', 'ko']]);
+  sec('fet', totes.filter(f => f.estat === 'aprovada' || f.estat === 'rebutjada'), [['pendent', 'Torna a pendents', 'b-sec']]);
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button[data-id]'); if (!b) return;
+  await Fotos.estat(b.dataset.id, b.dataset.e); pinta();
+});
+$('buida').onclick = async () => { if (confirm('Esborrar totes les fotos de prova d\'aquest mòbil?')) { await Fotos.buida(); pinta(); } };
+fetch('dades/data.json').then(r => r.json()).then(d => { zones = zonesDeRuta(d.route.track, d.pois); pinta(); });
+</script>
+</body>
+</html>

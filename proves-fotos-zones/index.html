@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Fotos de visitants · prototip</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="cap">
+  <div>
+    <div class="cap-sub">Prototip · fotos de visitants</div>
+    <h1 id="titol">Carregant…</h1>
+  </div>
+  <a class="cap-rev" href="revisio.html" title="Revisió de les fotos pendents">Revisió</a>
+</header>
+
+<div id="mapa"></div>
+
+<div class="llegenda">
+  <span><i class="ll-cam"></i> Fotos de visitants</span>
+  <span><i class="ll-poi"></i> Punt d'interès</span>
+</div>
+
+<button id="afegeix" class="afegeix" type="button">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l1.5 2H20a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+  Afegeix una foto
+</button>
+<input id="fitxer" type="file" accept="image/*" capture="environment" hidden>
+
+<!-- Full per enviar una foto -->
+<div id="envia" class="full" hidden>
+  <div class="full-caixa" role="dialog" aria-modal="true" aria-labelledby="envia-t">
+    <h2 id="envia-t">Envia la teva foto</h2>
+    <img id="envia-img" alt="La foto que enviaràs">
+    <label class="camp">On l'has feta?
+      <select id="envia-zona"></select>
+    </label>
+    <p id="envia-pos" class="nota"></p>
+    <label class="camp">Com vols sortir als crèdits? <span class="opc">(opcional)</span>
+      <input id="envia-autor" type="text" maxlength="40" placeholder="Visitant">
+    </label>
+    <label class="check"><input id="envia-cc" type="checkbox"> La foto és meva i la cedeixo a Natura Local amb llicència <a href="https://creativecommons.org/licenses/by/4.0/deed.ca" target="_blank" rel="noopener">CC BY 4.0</a>: sortirà amb el meu nom.</label>
+    <label class="check"><input id="envia-pers" type="checkbox"> No hi surten persones que es puguin reconèixer ni menors.</label>
+    <p class="nota">Abans d'enviar-la li traiem la ubicació exacta i les dades de la càmera. No es veurà fins que l'haguem revisada.</p>
+    <div class="botons">
+      <button type="button" id="envia-no" class="b-sec">Cancel·la</button>
+      <button type="button" id="envia-si" class="b-pri" disabled>Envia</button>
+    </div>
+  </div>
+</div>
+
+<!-- Carrusel -->
+<div id="carrusel" class="carrusel" hidden>
+  <div class="car-cap">
+    <div>
+      <div class="car-sub">Fotos de visitants</div>
+      <h2 id="car-t"></h2>
+    </div>
+    <button type="button" id="car-tanca" class="car-tanca" aria-label="Tanca">×</button>
+  </div>
+  <div class="car-pista" id="car-pista"></div>
+  <button type="button" class="car-fl car-ant" id="car-ant" aria-label="Anterior">‹</button>
+  <button type="button" class="car-fl car-seg" id="car-seg" aria-label="Següent">›</button>
+  <div class="car-peu">
+    <div id="car-credit"></div>
+    <div class="car-peu-d">
+      <span id="car-num"></span>
+      <button type="button" id="car-denuncia" class="car-den">Denuncia</button>
+    </div>
+  </div>
+</div>
+
+<div id="avis" class="avis" role="status" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="fotos.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
