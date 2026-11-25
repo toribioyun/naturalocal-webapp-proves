@@ -355,6 +355,7 @@ function pumpNotices() {
     noticeOn = true;
     const done = () => { if (!noticeOn) return; noticeOn = false; clearTimeout(noticeGuard); pumpNotices(); };
     clearTimeout(noticeGuard); noticeGuard = setTimeout(done, 2500 + n.text.length * 110); // Android sometimes never says «ended»
+    try { $('shAudio').pause(); } catch (e) {} // a spoken notice pauses the point's recorded audio (Toribio, 25/11/2026)
     speak(n.text, true, done);
     return;
   }
@@ -916,7 +917,7 @@ function show(nav) {
   $('home').hidden = nav; $('nav').hidden = !nav;
   if (nav) { resize(); if (!me) fitRoute(); drawProfile(); } else { if ($('nav').classList.contains('full')) setFull(false); stopSim(); hush(); stopGps(); checkOffline(); }
 }
-$('startBtn').onclick = () => { unlockAudio(); show(true); history.pushState({nav: 1}, ''); };
+$('startBtn').onclick = () => { unlockAudio(); speak('', true); show(true); history.pushState({nav: 1}, ''); }; // speak(''): unlocks the voice on iPhone
 $('backBtn').onclick = () => history.back();
 addEventListener('popstate', () => { closeSheet(); show(false); });
 
