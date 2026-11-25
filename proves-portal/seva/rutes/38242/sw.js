@@ -2,7 +2,7 @@
 // Cache-first for everything in this folder. VERSION is set by portal/scripts/genera.py (hash of the app files).
 // App, data and map are always saved; media and ortho tiles (zoom ≤ 17) opened online are saved too
 // (nl-rutes), so the route keeps working if coverage is lost without having downloaded it.
-const VERSION = '2d6dd98b88';
+const VERSION = 'a27cf6a46e';
 const SHELL = 'tpnlr38242-shell-' + VERSION;
 const ROUTES = 'tpnlr38242-media'; // media of downloaded routes (kept across app versions)
 const SHELL_FILES = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'idiomes.js', 'menu.js',

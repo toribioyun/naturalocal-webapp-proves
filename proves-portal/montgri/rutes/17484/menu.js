@@ -213,7 +213,17 @@ html:not([lang=ca]) .facts{grid-template-columns:repeat(2,1fr)} /* other languag
     if (!isFinite(lat) || !isFinite(lon)) { btn.hidden = true; return; }
     btn.hidden = false; btn.title = T('Com arribar-hi'); btn.setAttribute('aria-label', btn.title);
     btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>';
-    btn.onclick = () => window.open('https://www.google.com/maps/dir/?api=1&destination=' + (+lat).toFixed(6) + ',' + (+lon).toFixed(6) + '&travelmode=driving', '_blank', 'noopener');
+    const ll = (+lat).toFixed(6) + ',' + (+lon).toFixed(6), web = 'https://www.google.com/maps/dir/?api=1&destination=' + ll + '&travelmode=driving';
+    btn.onclick = () => {
+      // iPhone: the web address opened from the app left a blank page behind when coming back from Google Maps (Toribio, 25/11/2026).
+      // The Google Maps app opens directly; if it is not installed, the web address in the same window.
+      if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        const t = setTimeout(() => { if (document.visibilityState === 'visible') location.href = web; }, 1500);
+        const gone = () => { if (document.visibilityState === 'hidden') { clearTimeout(t); document.removeEventListener('visibilitychange', gone); } };
+        document.addEventListener('visibilitychange', gone);
+        location.href = 'comgooglemaps://?daddr=' + ll + '&directionsmode=driving';
+      } else window.open(web, '_blank', 'noopener');
+    };
   }
   const isDownloaded = id => !!get(DL, {})[id];
   return {share, drive, init, heart, isFav, favs, toggle, cfg, T, markDownloaded, unmarkDownloaded, isDownloaded, downloads, open};
