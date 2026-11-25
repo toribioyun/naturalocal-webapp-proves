@@ -206,6 +206,15 @@ html:not([lang=ca]) .facts{grid-template-columns:repeat(2,1fr)} /* other languag
     let ok = false; try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {}
     const old = btn.innerHTML; btn.innerHTML = ok ? '✓' : '!'; btn.title = ok ? T('Enllaç copiat ✓') : url; setTimeout(() => { btn.innerHTML = old; btn.title = T('Comparteix'); }, 2000);
   }
+  // «Com arribar-hi» (O-092, Toribio 25/11/2026): round car button that opens Google Maps with directions
+  // from where you are to the start of the route, or to the visit or service. Not on points of interest.
+  function drive(btn, lat, lon) {
+    if (!btn) return;
+    if (!isFinite(lat) || !isFinite(lon)) { btn.hidden = true; return; }
+    btn.hidden = false; btn.title = T('Com arribar-hi'); btn.setAttribute('aria-label', btn.title);
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>';
+    btn.onclick = () => window.open('https://www.google.com/maps/dir/?api=1&destination=' + (+lat).toFixed(6) + ',' + (+lon).toFixed(6) + '&travelmode=driving', '_blank', 'noopener');
+  }
   const isDownloaded = id => !!get(DL, {})[id];
-  return {share, init, heart, isFav, favs, toggle, cfg, T, markDownloaded, unmarkDownloaded, isDownloaded, downloads, open};
+  return {share, drive, init, heart, isFav, favs, toggle, cfg, T, markDownloaded, unmarkDownloaded, isDownloaded, downloads, open};
 })();

@@ -312,11 +312,12 @@ function selectDest(d, scrollCard) {
 function showPop(it) {
   popItem = it; const d = destOf(it.c), g = GROUPS[it.g];
   $('pop').innerHTML = `<span class="t" style="color:${g.col === '#e9bc00' ? '#8a6d00' : g.col}"><span>${g.label}</span> · ${esc(short(d))}${it.m ? ' · ' + esc(it.m.split(', ')[0]) : ''}</span><h3>${esc(it.n)}</h3>
-    <div class="pop-acts"><button id="popFav" class="hero-btn"></button><button id="popShare" class="hero-btn" aria-label="Comparteix" title="Comparteix"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg></button></div>
+    <div class="pop-acts"><button id="popDrive" class="hero-btn" hidden></button><button id="popFav" class="hero-btn"></button><button id="popShare" class="hero-btn" aria-label="Comparteix" title="Comparteix"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg></button></div>
     <div class="row"><a class="btn primary" href="${esc(it.c)}/#${it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei'}-${encodeURIComponent(it.id)}">Obre la fitxa ›</a><button id="popClose" class="small">Tanca</button></div>`;
   $('pop').hidden = false; $('cards').hidden = true; $('popClose').onclick = hidePop; draw(); remember();
   const kind = it.g === 'ruta' ? 'ruta' : it.g === 'visita' ? 'visita' : 'servei';
   NLM.heart($('popFav'), {k: it.c + '/' + kind + '-' + it.id, kind, n: it.n, d: short(d), foto: it.f ? it.c + '/' + it.f : '', lat: it.lat, lon: it.lon}, {icon: true});
+  NLM.drive($('popDrive'), +it.lat, +it.lon);
   $('popShare').onclick = () => NLM.share(it.n, new URL(it.c + '/fitxa/' + kind + '-' + encodeURIComponent(it.id) + '/', location.href).href, $('popShare'));
 }
 function hidePop() { if (!popItem && $('pop').hidden) return; popItem = null; $('pop').hidden = true; $('cards').hidden = false; draw(); }

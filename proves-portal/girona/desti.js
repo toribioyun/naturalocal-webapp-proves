@@ -214,6 +214,7 @@ function openSheet(i) {
   // ♡ and share always on the photo, top right, as in the destination and the route (Toribio, 22/11/2026)
   $('shShare').onclick = () => share(it.n, shareUrl(it), $('shShare'));
   NLM.heart($('shFav'), favItem(it), {icon: true});
+  NLM.drive($('shDrive'), +it.lat, +it.lon); // routes: lat/lon is the start of the track (checked 138/138, 25/11/2026)
   if ($('aNav')) $('aNav').onclick = () => { closeSheet(); startNav(it); };
   $('shActions').querySelectorAll('a[href^="rutes/"]').forEach(a => { a.onclick = rememberView; });
   $('aMap').onclick = () => { closeSheet(); showOnMap(it); };

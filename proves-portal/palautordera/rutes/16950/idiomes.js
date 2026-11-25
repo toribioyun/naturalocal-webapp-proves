@@ -78,6 +78,7 @@ const NL_I18N = {
   'Tria el mapa de fons': ['Elige el mapa de fondo', 'Choose base map', 'Choisir le fond de carte', 'Hintergrundkarte wählen'],
   'Tanca': ['Cerrar', 'Close', 'Fermer', 'Schließen'],
   'Comparteix': ['Compartir', 'Share', 'Partager', 'Teilen'],
+  'Com arribar-hi': ['Cómo llegar', 'Directions', 'Itinéraire', 'Route planen'],
 
   // chips and guide
   'Tot': ['Todo', 'All', 'Tout', 'Alle'],
