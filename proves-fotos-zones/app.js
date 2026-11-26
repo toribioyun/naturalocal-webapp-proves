@@ -9,19 +9,24 @@ function avis(text, ms = 3200) {
   clearTimeout(avis.t); avis.t = setTimeout(() => a.hidden = true, ms);
 }
 
-let ruta = null;
-// D-175: publicació directa (model Wikiloc). Només les fitxes que paga un ajuntament passen per revisió.
-// Al prototip, ?ajuntament=1 simula una d'aquestes fitxes.
-const revisioPrevia = new URLSearchParams(location.search).get('ajuntament') === '1';
+let ruta = null, rutaServ = null;
+// D-175: publicació directa (model Wikiloc). Només les fitxes que paga un ajuntament passen per revisió:
+// ho decideix el servidor (REVISIO_RUTES) i la resposta de cada pujada diu si ha quedat «pendent».
+let delServidor = [], servidorOk = false;          // fotos publicades de la ruta (de tothom)
+async function carregaServidor() {
+  try { delServidor = await Servidor.fotos(rutaServ); servidorOk = true; }
+  catch (e) { servidorOk = false; console.warn('Servidor de fotos:', e.message); }
+}
 /* Compartir: la foto va amb l'enllaç de la ruta, per portar-hi visites */
 async function comparteix(f) {
   const z = zones.perId[f.zona];
+  if (!f.blob && f.blobP) { try { await f.blobP; } catch { } }
   // Enllaç a la ruta dins de la web app (la fitxa amb foto i previsualització), no a la web de Drupal
   const url = (ruta.urlApp || ruta.url) + '?utm_source=fotos-visitants&utm_medium=compartir&utm_campaign=ruta-' + ruta.id;
   const text = `${z ? z.nom + ' · ' : ''}${ruta.name}. Fes-la tu també amb Natura Local: ${url}`;
-  const fitxer = new File([f.blob], 'natura-local.jpg', { type: 'image/jpeg' });
+  const fitxer = f.blob && new File([f.blob], 'natura-local.jpg', { type: 'image/jpeg' });
   try {
-    if (navigator.canShare && navigator.canShare({ files: [fitxer] })) await navigator.share({ files: [fitxer], title: ruta.name, text });
+    if (fitxer && navigator.canShare && navigator.canShare({ files: [fitxer] })) await navigator.share({ files: [fitxer], title: ruta.name, text });
     else if (navigator.share) await navigator.share({ title: ruta.name, text, url });
     else { await navigator.clipboard.writeText(text); avis("Enllaç copiat. Enganxa'l on vulguis."); }
   } catch (e) { if (e.name !== 'AbortError') avis("No s'ha pogut compartir des d'aquest navegador."); }
@@ -34,6 +39,7 @@ async function inicia() {
   $('titol').textContent = r.name;
   document.title = r.name + ' · fotos de visitants (prototip)';
   zones = zonesDeRuta(r.track, d.pois);
+  rutaServ = Servidor.ruta(r.id);
 
   mapa = L.map('mapa', { zoomControl: false, attributionControl: true });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -48,15 +54,28 @@ async function inicia() {
   capaCam = L.layerGroup().addTo(mapa);
   mapa.on('click', clicMapa);
   if (ultimaPos) posaJo(ultimaPos);
-  await pinta();
+  await pinta();                                 // primer les meves (sense esperar la xarxa)
+  await carregaServidor(); await pinta();
 }
 
-/* Una icona de càmera per zona que té fotos aprovades (o pendents meves). */
+/* Una icona de càmera per zona: les publicades de tothom (servidor) + les meves no publicades o pendents.
+   Estats de pantalla: aprovada (publicada) · pendent (només la veig jo) · meva (no publicada). */
 async function pinta() {
+  const perZona = {}, meves = await Fotos.totes();
   capaCam.clearLayers();
-  const perZona = {};
-  (await Fotos.totes()).filter(f => ['aprovada', 'pendent', 'meva'].includes(f.estat))
-    .forEach(f => (perZona[f.zona] ||= []).push(f));
+  const idsServ = new Set(delServidor.map(f => f.id));
+  const mevaDe = Object.fromEntries(meves.filter(f => f.servidorId).map(f => [f.servidorId, f]));
+  delServidor.forEach(f => (perZona[f.zona] ||= []).push({ ...f, estat: 'aprovada', servidor: true,
+                                                          propia: !!mevaDe[f.id], blob: mevaDe[f.id] && mevaDe[f.id].blob }));
+  meves.forEach(f => {
+    let e = null;
+    if (f.estat === 'meva') e = 'meva';
+    else if (f.estat === 'enviada' && !idsServ.has(f.servidorId)) {
+      if (f.servidorEstat === 'pendent') e = 'pendent';
+      else if (!servidorOk) e = 'aprovada';        // sense connexió: la meva publicada, des del mòbil
+    }
+    if (e) (perZona[f.zona] ||= []).push({ ...f, estat: e, propia: true });
+  });
   Object.entries(perZona).forEach(([zid, llista]) => {
     const z = zones.perId[zid]; if (!z) return;
     llista.sort((a, b) => (a.estat === 'aprovada' ? 0 : 1) - (b.estat === 'aprovada' ? 0 : 1) || a.data.localeCompare(b.data));
@@ -78,7 +97,9 @@ function obreCarrusel(z, llista) {
   carLlista = llista; carI = 0;
   $('car-t').textContent = z.nom;
   $('car-pista').innerHTML = llista.map((f, i) => {
-    const u = URL.createObjectURL(f.blob); urls.push(u);
+    let u;
+    if (f.blob) { u = URL.createObjectURL(f.blob); urls.push(u); }
+    else u = Servidor.imatge(f.id, 'gran');
     return `<div class="car-dia">${f.estat === 'pendent' ? '<span class="car-pend">Pendent de revisió · només la veus tu</span>' : f.estat === 'meva' ? '<span class="car-pend">No publicada · només la veus tu</span>' : ''}<img src="${u}" alt="Foto ${i + 1} de ${llista.length}: ${z.nom}"></div>`;
   }).join('');
   $('carrusel').hidden = false;
@@ -90,7 +111,9 @@ function peuCarrusel() {
   const data = new Date(f.data).toLocaleDateString('ca', { day: 'numeric', month: 'long', year: 'numeric' });
   $('car-credit').textContent = f.estat === 'meva' ? `La teva foto · ${data}` : `Foto: ${f.autor || 'Visitant'} · CC BY 4.0 · ${data}`;
   $('car-num').textContent = `${carI + 1} / ${carLlista.length}`;
-  $('car-denuncia').hidden = f.estat !== 'aprovada';
+  $('car-denuncia').hidden = f.estat !== 'aprovada' || !f.servidor || f.propia;
+  // per compartir-la com a fitxer cal tenir-la abans del clic (l'iPhone no espera)
+  if (!f.blob && !f.blobP && f.servidor) f.blobP = fetch(Servidor.imatge(f.id, 'gran')).then(r => r.ok ? r.blob() : null).then(b => f.blob = b);
   $('car-ant').style.visibility = carI > 0 ? 'visible' : 'hidden';
   $('car-seg').style.visibility = carI < carLlista.length - 1 ? 'visible' : 'hidden';
 }
@@ -113,8 +136,12 @@ document.addEventListener('keydown', e => {
 });
 $('car-comparteix').onclick = () => carLlista[carI] && comparteix(carLlista[carI]);
 $('car-denuncia').onclick = async () => {
-  const f = carLlista[carI]; if (!f) return;
-  await Fotos.estat(f.id, 'denunciada');
+  const f = carLlista[carI]; if (!f || !f.servidor) return;
+  const motiu = prompt('Per què la denuncies? (opcional; si hi surts tu i vols que la traiem, digues-ho)');
+  if (motiu === null) return;
+  try { await Servidor.denuncia(f.id, motiu); }
+  catch { avis("No s'ha pogut enviar la denúncia. Comprova la connexió i torna-ho a provar."); return; }
+  delServidor = delServidor.filter(x => x.id !== f.id);
   $('carrusel').hidden = true;
   avis('Gràcies. L\'hem amagada fins que la tornem a revisar.');
   pinta();
@@ -178,7 +205,7 @@ let perPublicar = [];
 function obrePublica(llista, final) {
   perPublicar = llista;
   $('veure-record').hidden = !final;
-  $('pub-revisio').textContent = revisioPrevia ? 'No es veuran fins que les haguem revisades.' : 'Sortiran a la ruta de seguida, amb el teu nom.';
+  $('pub-revisio').textContent = 'Sortiran a la ruta de seguida, amb el teu nom, i les veurà tothom.';
   $('avis').hidden = true;
   $('pub-t').textContent = final ? 'Has acabat la ruta!' : 'Publica la teva foto';
   $('pub-intro').textContent = final
@@ -218,16 +245,28 @@ $('cond-si').onclick = () => {
 };
 $('obre-cond').onclick = e => { e.preventDefault(); obreCondicions(false); };
 $('envia-si').onclick = () => condAcceptades() ? publica() : obreCondicions(true);
+let publicant = false;
 async function publica() {
+  if (publicant) return; publicant = true;
   const ids = triades(), autor = $('envia-autor').value.trim();
-  for (const f of perPublicar.filter(f => ids.includes(f.id)))
-    await Fotos.desa({ ...f, estat: revisioPrevia ? 'pendent' : 'aprovada', autor, llicencia: 'CC BY 4.0', enviada: new Date().toISOString() });
+  $('envia-si').disabled = true; $('envia-si').textContent = 'Enviant…';
+  let pub = 0, pend = 0, ko = 0;
+  for (const f of perPublicar.filter(f => ids.includes(f.id))) {
+    try {
+      const r = await Servidor.puja(f, rutaServ, autor, VERSIO_COND);
+      await Fotos.desa({ ...f, estat: 'enviada', servidorId: r.id, servidorEstat: r.estat, autor, llicencia: 'CC BY 4.0', enviada: new Date().toISOString() });
+      r.estat === 'pendent' ? pend++ : pub++;
+    } catch (e) { ko++; console.warn('Pujada:', e.message); }
+  }
+  publicant = false; valida();
   $('publica').hidden = true;
-  avis(revisioPrevia
-    ? (ids.length > 1 ? `Enviades ${ids.length} fotos! Sortiran a la ruta quan les haguem revisades.` : 'Enviada! Sortirà a la ruta quan l\'haguem revisada.')
-    : (ids.length > 1 ? `Publicades ${ids.length} fotos! Ja surten a la ruta.` : 'Publicada! Ja surt a la ruta.'));
-  pinta();
-};
+  const t = [];
+  if (pub) t.push(pub > 1 ? `Publicades ${pub} fotos! Ja surten a la ruta per a tothom.` : 'Publicada! Ja surt a la ruta per a tothom.');
+  if (pend) t.push(pend > 1 ? `${pend} fotos sortiran quan les haguem revisades.` : "La foto sortirà quan l'haguem revisada.");
+  if (ko) t.push((ko > 1 ? `${ko} fotos no s'han pogut enviar` : "La foto no s'ha pogut enviar") + ': no hi ha connexió. Queda desada al mòbil; torna-ho a provar en acabar la ruta.');
+  avis(t.join(' '), ko ? 7000 : 4000);
+  await carregaServidor(); pinta();
+}
 $('acaba').onclick = async () => {
   const meves = (await Fotos.totes()).filter(f => f.estat === 'meva').sort((a, b) => a.data.localeCompare(b.data));
   if (!meves.length) { location.href = 'record.html'; return; }      // sense fotos per publicar: directe al record

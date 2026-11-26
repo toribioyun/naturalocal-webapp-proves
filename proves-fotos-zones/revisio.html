@@ -11,47 +11,100 @@
 <body>
 <header class="cap">
   <div>
-    <div class="cap-sub">Prototip · només per a Natura Local</div>
+    <div class="cap-sub">Només per a Natura Local</div>
     <h1>Revisió de fotos de visitants</h1>
   </div>
   <a class="cap-rev" href="index.html">‹ Mapa</a>
 </header>
 <main class="rev">
-  <p class="nota">Model Wikiloc (D-175): les fotos es publiquen a l'instant i aquí es revisen les denunciades. Només les de les fitxes que paga un ajuntament esperen a «Pendents». Les persones hi poden sortir: qui publica declara que en té el permís i, si hi ha menors, que n'és el tutor o en té l'autorització. Retira les fotos amb menors en situacions íntimes o que els puguin perjudicar, nus, publicitat, les que no siguin de la ruta i les que algú que hi surt demani treure. En aquest prototip les fotos són només en aquest mòbil; amb Cloudinary aquesta llista serà la de tothom.</p>
-  <h2>Pendents</h2>
-  <div id="pend"></div>
-  <h2>Denunciades</h2>
-  <div id="den"></div>
-  <h2>Publicades i rebutjades</h2>
-  <div id="fet"></div>
-  <p><button type="button" id="buida" class="b-sec" style="border:0;border-radius:10px;padding:8px 14px">Esborra totes les fotos de prova d'aquest mòbil</button></p>
+  <div id="entra" hidden>
+    <p class="nota">Aquesta pàgina necessita la clau d'administració. Obre-la des de l'enllaç de revisió que tens desat (només cal la primera vegada en cada mòbil) o enganxa-la aquí.</p>
+    <p><input id="clau" type="password" autocomplete="off" placeholder="Clau d'administració" style="width:100%;padding:10px;border-radius:10px;border:1px solid #ccc">
+       <button type="button" id="desa-clau" class="ok" style="margin-top:8px">Entra</button></p>
+  </div>
+  <div id="tot" hidden>
+    <p class="nota">Model Wikiloc (D-175): les fotos es publiquen a l'instant i aquí es revisen les denunciades (ja estan amagades). Només les de les fitxes que paga un ajuntament esperen a «Pendents». Retira les fotos amb menors en situacions íntimes o que els puguin perjudicar, nus, publicitat, les que no siguin de la ruta i les que algú que hi surt demani treure. <b>Esborra</b> només si ho demana qui hi surt o l'autor (D-175 (9)): esborra el fitxer i no es pot desfer; si no, <b>Retira-la</b> (D-013).</p>
+    <p id="resum" class="nota"></p>
+    <h2>Pendents</h2>
+    <div id="pend"></div>
+    <h2>Denunciades</h2>
+    <div id="den"></div>
+    <h2>Publicades (les 30 últimes)</h2>
+    <div id="pub"></div>
+    <h2>Retirades</h2>
+    <div id="ret"></div>
+    <p><button type="button" id="surt" class="b-sec" style="border:0;border-radius:10px;padding:8px 14px">Treu la clau d'aquest mòbil</button></p>
+  </div>
 </main>
 <script src="fotos.js"></script>
 <script>
+/* Revisió contra el servidor (26/11/2026, O-088). La clau d'administració no és al codi:
+   arriba per l'enllaç «revisio.html#clau=…» (es desa al mòbil i s'esborra de l'adreça) o s'enganxa a mà. */
 const $ = id => document.getElementById(id);
-let zones;
-const fitxa = (f, botons) => {
-  const u = URL.createObjectURL(f.blob), z = zones.perId[f.zona];
-  return `<div class="rev-f"><img src="${u}" alt=""><div class="rev-d">
-    <b>${z ? z.nom : f.zona}</b>
-    <div>${f.autor || 'Visitant'} · ${f.llicencia} · ${new Date(f.data).toLocaleString('ca')}</div>
-    ${f.estat !== 'pendent' ? `<span class="rev-est est-${f.estat}">${f.estat}</span>` : ''}
-    <div class="rev-b">${botons.map(([e, t, c]) => `<button type="button" class="${c}" data-id="${f.id}" data-e="${e}">${t}</button>`).join('')}</div>
+const CLAU_LS = 'nl-fotos-clau-admin';
+const llegeixClau = () => { try { return localStorage.getItem(CLAU_LS) || ''; } catch { return ''; } };
+const desaClau = c => { try { localStorage.setItem(CLAU_LS, c); } catch { } };
+const h = new URLSearchParams(location.hash.slice(1));
+if (h.get('clau')) { desaClau(h.get('clau')); history.replaceState(null, '', location.pathname + location.search); }
+let A, zones, urls = [];
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const data = d => new Date(A.dataISO(d)).toLocaleString('ca');
+
+function fitxa(f, botons, extra = '') {
+  const z = zones && zones.perId[f.zona];
+  return `<div class="rev-f" data-foto="${esc(f.id)}"><img alt="" data-id="${esc(f.id)}"><div class="rev-d">
+    <b>${esc(z ? z.nom : f.zona)}</b> <small>· ruta ${esc(f.ruta)}</small>
+    <div>${esc(f.autor || 'Visitant')} · ${esc(f.llicencia)} · ${data(f.data)}</div>${extra}
+    <span class="rev-est est-${esc(f.estat)}">${esc(f.estat)}</span>
+    <div class="rev-b">${botons.map(([e, t, c]) => `<button type="button" class="${c}" data-id="${esc(f.id)}" data-e="${e}">${t}</button>`).join('')}</div>
   </div></div>`;
-};
+}
 async function pinta() {
-  const totes = (await Fotos.totes()).sort((a, b) => b.data.localeCompare(a.data));
-  const sec = (id, ll, botons) => $(id).innerHTML = ll.length ? ll.map(f => fitxa(f, botons)).join('') : '<p class="rev-buit">Cap.</p>';
-  sec('pend', totes.filter(f => f.estat === 'pendent'), [['aprovada', 'Aprova', 'ok'], ['rebutjada', 'Rebutja', 'ko']]);
-  sec('den', totes.filter(f => f.estat === 'denunciada'), [['aprovada', 'Torna-la a mostrar', 'ok'], ['rebutjada', 'Retira-la', 'ko']]);
-  sec('fet', totes.filter(f => f.estat === 'aprovada' || f.estat === 'rebutjada'), [['rebutjada', 'Retira-la', 'ko'], ['pendent', 'Torna a pendents', 'b-sec']]);
+  let x;
+  try { x = await A.exporta(); }
+  catch (e) {
+    if (/clau/.test(e.message)) { $('tot').hidden = true; $('entra').hidden = false; return; }
+    $('resum').textContent = "No s'ha pogut connectar amb el servidor: " + e.message; return;
+  }
+  $('entra').hidden = true; $('tot').hidden = false;
+  urls.splice(0).forEach(u => URL.revokeObjectURL(u));
+  const fotos = x.fotos.filter(f => f.estat !== 'esborrada').sort((a, b) => b.data.localeCompare(a.data));
+  const motius = {};
+  x.denuncies.forEach(d => (motius[d.foto] ||= []).push(d));
+  const n = e => fotos.filter(f => f.estat === e).length;
+  const mb = (x.fotos.reduce((s, f) => s + (f.bytes || 0), 0) / 1048576).toFixed(1).replace('.', ',');
+  $('resum').textContent = `${n('publicada')} publicades · ${n('pendent')} pendents · ${n('denunciada')} denunciades · ${n('retirada')} retirades · ${mb} MB de 10 GB gratuïts.`;
+  const sec = (id, ll, botons, extra) => $(id).innerHTML = ll.length ? ll.map(f => fitxa(f, botons, extra ? extra(f) : '')).join('') : '<p class="rev-buit">Cap.</p>';
+  const ESB = ['esborra', 'Esborra (a petició)', 'b-sec'];
+  sec('pend', fotos.filter(f => f.estat === 'pendent'), [['publicada', 'Aprova', 'ok'], ['retirada', 'Rebutja', 'ko'], ESB]);
+  sec('den', fotos.filter(f => f.estat === 'denunciada'), [['publicada', 'Torna-la a mostrar', 'ok'], ['retirada', 'Retira-la', 'ko'], ESB],
+      f => (motius[f.id] || []).map(d => `<div class="nota">Denúncia ${data(d.data)}: «${esc(d.motiu || 'sense motiu')}»${d.contacte ? ' · ' + esc(d.contacte) : ''}</div>`).join(''));
+  sec('pub', fotos.filter(f => f.estat === 'publicada').slice(0, 30), [['retirada', 'Retira-la', 'ko'], ESB]);
+  sec('ret', fotos.filter(f => f.estat === 'retirada'), [['publicada', 'Torna-la a mostrar', 'ok'], ESB]);
+  for (const img of document.querySelectorAll('img[data-id]')) {
+    A.imatge(img.dataset.id, 'mini').then(b => { const u = URL.createObjectURL(b); urls.push(u); img.src = u; }).catch(() => img.alt = 'sense fitxer');
+  }
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('button[data-id]'); if (!b) return;
-  await Fotos.estat(b.dataset.id, b.dataset.e); pinta();
+  const id = b.dataset.id, accio = b.dataset.e;
+  try {
+    if (accio === 'esborra') {
+      const motiu = prompt("Qui ho demana i per què? (queda al registre). L'esborrat no es pot desfer.");
+      if (!motiu) return;
+      if (!confirm('Esborrar la foto definitivament? No es pot desfer.')) return;
+      await A.esborra(id, motiu);
+    } else await A.estat(id, accio, 'revisio.html');
+  } catch (err) { alert("No s'ha pogut fer: " + err.message); }
+  pinta();
 });
-$('buida').onclick = async () => { if (confirm('Esborrar totes les fotos de prova d\'aquest mòbil?')) { await Fotos.buida(); pinta(); } };
-fetch('dades/data.json').then(r => r.json()).then(d => { zones = zonesDeRuta(d.route.track, d.pois); pinta(); });
+$('desa-clau').onclick = () => { const c = $('clau').value.trim(); if (c) { desaClau(c); A = Servidor.admin(c); pinta(); } };
+$('surt').onclick = () => { try { localStorage.removeItem(CLAU_LS); } catch { } location.reload(); };
+fetch('dades/data.json').then(r => r.json()).then(d => { zones = zonesDeRuta(d.route.track, d.pois); }).catch(() => { }).finally(() => {
+  const c = llegeixClau();
+  if (!c) { $('entra').hidden = false; return; }
+  A = Servidor.admin(c); pinta();
+});
 </script>
 </body>
 </html>
